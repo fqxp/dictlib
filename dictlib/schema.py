@@ -1,36 +1,9 @@
 #from bson.objectid import ObjectId
-from dictlib.utils import update_recursive, walk
-from types import DictType, TypeType, NoneType
+from dictlib.utils import update_recursive
+from pymongo.objectid import ObjectId
+from types import TypeType, NoneType
 import datetime
 import dateutil.parser
-import json
-
-def get_dict_value(d, path):
-    """ Get a value of a key in dictionary `d` where the key is given in dot
-    notation.
-
-    :param d: A dictionary.
-    :param path: A path in dot notation.
-    :raises KeyError: If dot-separated dotted_path wasn't found in dictionary 
-        `d`.
-    """
-    while True:
-        path, _, key = path.partition(u'.')
-        if key:
-            d = d[path]
-            path = key
-        else:
-            return d[path]
-        
-def set_dict_value(d, path, v):
-    while True:
-        path, _, key = path.partition(u'.')
-        if key:
-            d = d[path]
-            path = key
-        else:
-            d[path] = v
-            break
     
 class ValidationError(Exception):
     pass
@@ -38,14 +11,14 @@ class ValidationError(Exception):
 class SchemaFieldNotFound(Exception):
     pass
 
-class JsonCodableMixin(object):
-    pass
-
-
 class Field(object):
+    description = None
+    title = None
+    
     """ The base class for fields in a `DictSchema`.
     """
-    def __init__(self, optional=False, default=None, can_be_none=False):
+    def __init__(self, optional=False, default=None, can_be_none=False,
+                 title=None, description=None):
         """ Constructor.
          
         :param optional: Whether this field must exist (`False`) or may not
@@ -57,6 +30,8 @@ class Field(object):
         self.optional = optional
         self.default = default
         self.can_be_none = can_be_none
+        self.title = title
+        self.description = description or self.description
     
     def validate(self, value, field_name, partial=False):
         """ Validate the field. Subclasses must invoke this method subsequently.
@@ -80,6 +55,7 @@ class Field(object):
         :todo: Rename this method?
         """ 
         return v
+    
 
 class TypeField(Field):
     """ A `TypeField` is a field that has a specific Python type.
@@ -88,23 +64,32 @@ class TypeField(Field):
 
     def validate(self, value, field_name=None, partial=False):
         super(TypeField, self).validate(value, field_name, partial)
-        if not type(value) is self.type_ and \
+        if not isinstance(value, self.type_) and \
                 not (value is None and self.can_be_none):
             raise ValidationError(u'Field %s: Value %r has wrong type %s' %
                                   (field_name, value, type(value)))
+            
+    def __unicode__(self):
+        return u'<TypeField: type=%s>' % self.type_
+    
+class FieldField(TypeField):
+    type_ = Field
 
+class AnyField(Field):
+    pass
+            
 class NoneField(TypeField):
     """ A schema field with type None, i. e. a field that can only be `None`.
     """
     type_ = NoneType
     
-    def __init__(self, optional=False, default=None):
+    def __init__(self, optional=False, default=None, title=None, description=None):
         super(NoneField, self).__init__(optional=optional, default=default, 
                                         can_be_none=True)
 
 class AbstractNumericField(TypeField):
     def __init__(self, optional=False, default=None, can_be_none=False,
-                 min=None, max=None):
+                 min=None, max=None, description=None):
         super(AbstractNumericField, self).__init__(optional=optional, default=default,
                                                    can_be_none=can_be_none)
         self.min = min
@@ -137,19 +122,19 @@ class UnicodeField(TypeField):
     """
     type_ = unicode
     
-#class ObjectIdField(TypeField):
-#    """ A schema field for `ObjectId` values.
-#    
-#    Values are JSON-encoded to unicode values.
-#    """
-#    type_ = ObjectId
-#    
-#    def from_json(self, v):
-#        return ObjectId(v) if v else None
-#    
-#    def to_json(self, v):
-#        return unicode(v) if v else None
+class ObjectIdField(TypeField):
+    """ A schema field for `ObjectId` values.
     
+    Values are JSON-encoded to unicode values.
+    """
+    type_ = ObjectId
+    
+    def from_json(self, v):
+        return ObjectId(v) if v else None
+    
+    def to_json(self, v):
+        return unicode(v) if v else None
+
 class DatetimeField(TypeField):
     """ A schema field for `datetime` values.
     
@@ -186,7 +171,7 @@ class ListField(TypeField):
     type_ = list
     
     def __init__(self, fields=None, optional=False, default=[], min_len=0, 
-                 max_len=None, can_be_none=False):
+                 max_len=None, can_be_none=False, title=None, description=None):
         """ Constructor.
 
         :param fields: A list of possible fields for the elements of the list.
@@ -325,7 +310,7 @@ class DictField(TypeField):
         :todo: Rename this method?
         """ 
         for key, value in v.iteritems():
-            yield (key, self.get_field(key).from_json(value))
+            yield (key, self.get_field(key).to_json(value))
 
     def get_field(self, key):
         if key in self._schema:
@@ -342,8 +327,9 @@ class DictField(TypeField):
 
 
 class Schema(DictField):
-    def __init__(self, schema=None):
-        super(Schema, self).__init__(schema, optional=False, default={}, can_be_none=False)
+    def __init__(self, schema=None, description=None):
+        super(Schema, self).__init__(schema, optional=False, default={}, can_be_none=False,
+                                     description=None)
 
     def create(self, default={}, factory=dict, _subschema=None):
         """ Create a document from this schema by using the default values from
@@ -355,7 +341,7 @@ class Schema(DictField):
         :return: A newly created dictionary matching the structure of the schema.
         """
         schema = _subschema or self._schema
-        doc = factory
+        doc = factory()
         
         for key, field in schema.iteritems():
             if type(key) is TypeType:
@@ -364,8 +350,7 @@ class Schema(DictField):
             if not field.optional:
                 if isinstance(field, DictField):
                     doc[key] = self.create(default.get(key, {}), 
-                                           factory=factory,
-                                           _subschema=field)
+                                           _subschema=field._schema)
                 elif hasattr(field.default, u'__call__'):
                     doc[key] = field.default()
                 else:
@@ -395,94 +380,94 @@ class Schema(DictField):
             return False
 ################################################################################
 
-class SchemaFormInvalid(Exception):
-    pass
-
-class SchemaForm(object):
-    schema = None
-    # Field names in dot separated notation
-    include = []
-    exclude = []
-    
-    def __init__(self, data):
-        """
-        :param data: Either a dictionary or a string containing a JSON 
-            dictionary.
-        """
-        self.errors = []
-        if not isinstance(data, dict):
-            data = self.load_json(data)
-        self.data = self._decode_json_dict(data)
-
-    def is_valid(self):
-        self.errors = []
-        
-        for path, value in walk(self.data):
-            if self.exclude and path in self.exclude:
-                raise SchemaFormInvalid(u'Form var %s excluded from form' % path)
-            elif self.include and path not in self.include:
-                raise SchemaFormInvalid(u'Form var %s not included from form' % path)
-
-            try:      
-                self.schema.get_field(path).validate(value)
-            except SchemaFieldNotFound as e:
-                self.errors.append(unicode(e))
-            except ValidationError as e:
-                self.errors.append(unicode(e))
-                
-        return not self.errors
-    
-    def load_json(self, s):
-        doc = json.loads(s) #, object_hook=json_util.object_hook)
-        return self._decode_json_dict(doc)
-    
-    def _decode_json_dict(self, doc, _subschema=None):
-        schema = _subschema or self.schema.get_schema()
-        decoded_doc = {}
-        
-        for key, value in doc.iteritems():
-            try:
-                field = self.schema.get_field(key, schema)
-                
-                if type(field) is DictType:
-                    decoded_doc[key] = self._decode_json_dict(value, field)
-                else:
-                    decoded_doc[key] = field.from_json(value)
-            except SchemaFieldNotFound:
-                # Unknown field - we'll leave it as it is
-                decoded_doc[key] = value
-                
-        return decoded_doc
-
-    def dump_json(self, doc):
-        return json.dumps(self._encode_json_dict(doc))
-
-    def _encode_json_dict(self, doc, _subschema=None):
-        schema = _subschema or self.schema.get_schema()
-        encoded_doc = {}
-        
-        for key, value in doc.iteritems():
-            try:
-                field = self.schema.get_field(key, schema)
-                
-                if type(field) is DictType:
-                    encoded_doc[key] = self._encode_json_dict(value, field)
-                else:
-                    encoded_doc[key] = field.to_json(value)
-            except SchemaFieldNotFound:
-                encoded_doc[key] = value
-
-        return encoded_doc
+#class SchemaFormInvalid(Exception):
+#    pass
+#
+#class SchemaForm(object):
+#    schema = None
+#    # Field names in dot separated notation
+#    include = []
+#    exclude = []
+#    
+#    def __init__(self, data):
+#        """
+#        :param data: Either a dictionary or a string containing a JSON 
+#            dictionary.
+#        """
+#        self.errors = []
+#        if not isinstance(data, dict):
+#            data = self.load_json(data)
+#        self.data = self._decode_json_dict(data)
+#
+#    def is_valid(self):
+#        self.errors = []
+#        
+#        for path, value in walk(self.data):
+#            if self.exclude and path in self.exclude:
+#                raise SchemaFormInvalid(u'Form var %s excluded from form' % path)
+#            elif self.include and path not in self.include:
+#                raise SchemaFormInvalid(u'Form var %s not included from form' % path)
+#
+#            try:      
+#                self.schema.get_field(path).validate(value)
+#            except SchemaFieldNotFound as e:
+#                self.errors.append(unicode(e))
+#            except ValidationError as e:
+#                self.errors.append(unicode(e))
+#                
+#        return not self.errors
+#    
+#    def load_json(self, s):
+#        doc = json.loads(s) #, object_hook=json_util.object_hook)
+#        return self._decode_json_dict(doc)
+#    
+#    def _decode_json_dict(self, doc, _subschema=None):
+#        schema = _subschema or self.schema.get_schema()
+#        decoded_doc = {}
+#        
+#        for key, value in doc.iteritems():
+#            try:
+#                field = self.schema.get_field(key, schema)
+#                
+#                if type(field) is DictType:
+#                    decoded_doc[key] = self._decode_json_dict(value, field)
+#                else:
+#                    decoded_doc[key] = field.from_json(value)
+#            except SchemaFieldNotFound:
+#                # Unknown field - we'll leave it as it is
+#                decoded_doc[key] = value
+#                
+#        return decoded_doc
+#
+#    def dump_json(self, doc):
+#        return json.dumps(self._encode_json_dict(doc))
+#
+#    def _encode_json_dict(self, doc, _subschema=None):
+#        schema = _subschema or self.schema.get_schema()
+#        encoded_doc = {}
+#        
+#        for key, value in doc.iteritems():
+#            try:
+#                field = self.schema.get_field(key, schema)
+#                
+#                if type(field) is DictType:
+#                    encoded_doc[key] = self._encode_json_dict(value, field)
+#                else:
+#                    encoded_doc[key] = field.to_json(value)
+#            except SchemaFieldNotFound:
+#                encoded_doc[key] = value
+#
+#        return encoded_doc
 
 
 ###############################################################################
 
-#class MongoDbSchema(DictSchema):
-#    schema = {
-#        u'_id': ObjectIdField(optional=True),
-#    }
+class MongoDbSchema(Schema):
+    schema = {
+        u'_id': ObjectIdField(optional=True),
+    }
 
-class CouchDbSchema(DictSchema):
+class CouchDbSchema(Schema):
     schema = {
         u'_id': UnicodeField(optional=True),
         u'_rev': UnicodeField(optional=True)}

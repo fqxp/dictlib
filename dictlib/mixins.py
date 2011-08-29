@@ -1,10 +1,14 @@
 from UserDict import DictMixin
 from dictlib.utils import setitem, getitem, delitem, contains
 
-class DotNotationAdapter(DictMixin, object):
+__all__ = (u'DotNotationAdapter', u'DotNotationMixin', u'ObjectMappingAdapter', 
+           u'ObjectMappingMixin')
+
+class AbstractAdapter(DictMixin):
     def __init__(self, doc):
         self.__dict__[u'_doc'] = doc
-            
+
+class DotNotationAdapter(AbstractAdapter):
     def __getitem__(self, key):
         return getitem(self._doc, key)
 
@@ -20,7 +24,6 @@ class DotNotationAdapter(DictMixin, object):
     def keys(self):
         return self._doc.keys()
 
-
 class DotNotationMixin(object):
     """ Return a field by `name`. This method can be used both for dotted
     paths (e. g. 'info.author.first_name') and for recursive walking through
@@ -31,25 +34,22 @@ class DotNotationMixin(object):
         `self.schema`.
     """
     def __getitem__(self, key):
-        return getitem(super(DotNotationMixin, self), key)
+        return getitem(self, key)
 
     def __setitem__(self, key, value):
-        setitem(super(DotNotationMixin, self), key, value)
+        setitem(self, key, value)
 
     def __delitem__(self, key):
-        delitem(super(DotNotationMixin, self), key)
+        delitem(self, key)
         
     def __contains__(self, key):
-        return contains(super(DotNotationMixin, self), key)
+        return contains(self, key)
         
     def keys(self):
-        return super(DotNotationMixin, self).keys()
+        return dict.keys(self)
 
 
-class ObjectMappingAdapter(DictMixin):
-    def __init__(self, doc):
-        self.__dict__[u'_doc'] = doc
-
+class ObjectMappingAdapter(AbstractAdapter):
     def __getitem__(self, key):
         value = self._doc[key]
         if isinstance(value, dict):
@@ -71,9 +71,10 @@ class ObjectMappingAdapter(DictMixin):
     def __getattr__(self, key):
         try:
             value = self._doc[key]
-#            value = object.__getattribute__(self, u'_doc')[key]
             if isinstance(value, dict):
                 return ObjectMappingAdapter(value)
+            else:
+                return value
         except KeyError:
             raise AttributeError(u'Object has no attribute %s' % key)
         
@@ -90,6 +91,8 @@ class ObjectMappingMixin(object):
             value = self[key]
             if isinstance(value, dict):
                 return ObjectMappingAdapter(value)
+            else:
+                return value
         except KeyError:
             raise AttributeError(u'Object has no attribute %s' % key)
         
@@ -98,4 +101,3 @@ class ObjectMappingMixin(object):
             self[key] = value
         except KeyError:
             raise AttributeError(u'Object has no attribute %s' % key)
-

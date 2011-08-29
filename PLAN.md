@@ -18,10 +18,10 @@ Components
  * [done] schema: Definition of the structure of arbitrary dictionaries; later: should
    be convertible to external schema description formats (e. g. JSON Schema)
  * [done] validator: Validate dict objects againsts a schema
- * converter: Convert a dict to another format using a schema and a converter
+ * [done] converter: Convert a dict to another format using a schema and a converter
    describing the transformations made (rename, convert by function ...)
  * [done] creator: Create objects matching a schema, using default values, optionality
    etc., provide initial values
- * object mapping: Map dictionary to python object, create database models by
+ * [done] object mapping: Map dictionary to python object, create database models by
    subclassing and adding functions like save/load, validate/create functions
  * [done] utilities: recursive update etc.

@@ -16,28 +16,31 @@ along with dictlib.  If not, see <http://www.gnu.org/licenses/>.
 """
 import collections
 
-def update_recursive(dict_, data, skip_none=False):
+def update_recursive(doc, update_doc, skip_none=False):
     """ 
-    Updates the dictionary-like object `dict_` with the value from `data`
+    Updates the dictionary-like object `doc` with the value from `update_doc`
     recursively, e. g.:
     >>> d1 = {'a': 1, 'b': {'c': 3, 'd': 4}}
     >>> update_recursive(d1, {'a': 2, 'b': {'c': 5}}
     {'a': 2, 'b': {'c': 5, 'd': 4}}
 
-    :param dict_: The dictionary to update; will modified in-place
-    :param data: The data to update the dictionary with
+    :param doc: The dictionary to update; will modified in-place
+    :param update_doc: The update_doc to update the dictionary with
     :param skip_none: if True, do not update values which would become None
         in the result.
-    :returns: The dictionary `dict_`
+    :returns: The updated dictionary `doc`
     """
-    for k, v in data.iteritems():
+    for k, v in update_doc.iteritems():
         if isinstance(v, collections.Mapping):
-            dict_[k] = update_recursive(dict_.get(k, {}), v, skip_none)
+            inner_doc = doc.get(k)
+            if not isinstance(inner_doc, collections.Mapping):
+                doc[k] = {}
+            doc[k] = update_recursive(doc[k], v, skip_none)
         elif v is None and skip_none:
             continue
         else:
-            dict_[k] = data[k]
-    return dict_
+            doc[k] = update_doc[k]
+    return doc
 
 
 def walk(d, field_name=None):
@@ -51,7 +54,8 @@ def walk(d, field_name=None):
     for key, value in d.iteritems():
         assert u'.' not in key, u'walk() doesn\'t accept key in dot notation: %s' % key
         if hasattr(value, u'iteritems'):
-            walk(value, key)
+            for pair in walk(value, key):
+                yield pair
         else:
             yield (u'%s.%s' % (field_name, key) if field_name else key,
                    value)
@@ -85,8 +89,10 @@ def getitem(doc, key):
      * doc['a.2'] -> doc['a'][2]    # 1 is interpreted as list index
     """
     container, key = _get_container_and_key(doc, key)
-            
-    return container.__getitem__(key)
+
+    # Make sure we don't get in the way of subclass implementations of 
+    # __getitem__()
+    return dict.__getitem__(container, key)
 
 def setitem(doc, key, value):
     """ Set the value of `key` in dictionary `doc` (optionally in dotted notation).
@@ -109,19 +115,19 @@ def setitem(doc, key, value):
                     cnt_len = len(sub_container)
                     sub_container[cnt_len:index+1] = [None]*(index+1-cnt_len)
                 except KeyError:
-                    container.__setitem__(key, [None]*(index+1))
+                    dict.__setitem__(container, key, [None]*(index+1))
             except ValueError:
                 if key not in container.keys():
-                    container.__setitem__(key, dict())
-            container = container.__getitem__(key)
+                    dict.__setitem__(container, key, dict())
+            container = dict.__getitem__(container, key)
 
-    container.__setitem__(key, value)
+    dict.__setitem__(container, key, value)
 
 def delitem(doc, key):
     container, key = _get_container_and_key(doc, key)
-            
-    container.__delitem__(key)
+
+    dict.__delitem__(container, key)
 
 def contains(doc, key):
     container, key = _get_container_and_key(doc, key)
-    return key in container
+    return dict.__contains__(container, key)
