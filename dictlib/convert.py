@@ -1,56 +1,83 @@
 from dictlib.mixins import DotNotationAdapter
 from dictlib.utils import walk
 from dictlib.schema import AbstractNumericField, ListField, UnicodeField,\
-    DictField, Schema, FieldField, NoneField, AnyField
+    DictField, Schema, FieldField, NoneField, AnyField, UuidField
+
+"""
+DictField({
+  '_id': UuidField(),
+  'a': UnicodeField(),
+  'b': DictField({'c': UnicodeField()}),
+}
+->
+DictField({
+  'id': UnicodeField(),
+  'a': UnicodeField(),
+  'b': DictField({'c': UnicodeField()}),
+}
+
+"""
 
 class Converter(object):
-    # Fields to exclude when converting to JSON (in dot notation)
-    exclude = set()
-    rename = list()
+    """ A `Converter` can be used to convert a dictionary into another
+    dictionary according to a set of rules.
     
-    def __init__(self, schema, exclude=[], rename=(), factory=dict):
+    Rules:
+    * `exclude`: a list of  
+    """
+    # Fields to exclude when converting to JSON (in dot notation)
+    exclude = []
+    rename = []
+    
+    def __init__(self, schema, exclude=[], rename=(), factory=lambda o: o):
         self.schema = schema
-        self.exclude.update(exclude)
+        self.exclude.extend(exclude)
         self.rename.extend(rename)
         self.factory = factory
         self.rename_inv = list((v, k) for k, v in self.rename)
-        
-    def to_json(self, doc):
-        json_doc = DotNotationAdapter(dict(self.schema.to_json(doc)))
+
+    def from_schema(self, doc):
+        # Exclude fields
+        dot_doc = DotNotationAdapter(doc)
+        for key, value in dot_doc.walk():
+            dot_doc[key] = self.map_from(key, value)
+            if self.exclude_field(dot_doc, key):
+                del dot_doc[key]
         # Rename keys
         for rename_key, rename_value in self.rename:
-            if rename_key in json_doc:
-                json_doc[rename_value] = json_doc[rename_key]
-                del json_doc[rename_key]
-        # Exclude fields
-        for key, value in walk(json_doc):
-            if self.exclude_field(json_doc, key):
-                del json_doc[key]
-        return json_doc
-
-    def from_json(self, json_doc):
+            if rename_key in dot_doc:
+                dot_doc[rename_value] = dot_doc[rename_key]
+                del dot_doc[rename_key]
+        return doc
+    
+    def to_schema(self, doc):
+        for key, value in walk(doc):
+            doc[key] = self.map_to(key, value)
         for rename_key, rename_value in self.rename_inv:
-            if rename_key in json_doc:
-                json_doc[rename_value] = json_doc[rename_key]
-                del json_doc[rename_key]
-        return self.factory(self.schema.from_json(json_doc))
+            if rename_key in doc:
+                doc[rename_value] = doc[rename_key]
+                del doc[rename_key]
+        return doc
+    
+    def exclude_field(self, json_doc, key):
+        return False
+    
+    def map_from(self, key, value):
+        return value
+
+    def map_to(self, key, value):
+        return value
+    
+class JsonConverter(Converter):
+    def to_schema(self, json_doc):
+        return self.factory(super(JsonConverter, self).to_schema(self.schema.from_json(json_doc)))
+
+    def from_schema(self, doc):
+        return super(JsonConverter, self).from_schema(dict(self.schema.to_json(doc)))
 
     def exclude_field(self, json_doc, key):
         return key in self.exclude
-    
 
-
-"""
-
-schema = {
-    'a': UnicodeField(),
-    'b': DictField({'c': UnicodeField()}
-}
-->
-
-
-
-"""
 class JsonSchemaSchema(Schema):
     schema = {
         unicode: FieldField(optional=True),

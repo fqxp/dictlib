@@ -35,7 +35,7 @@ def update_recursive(doc, update_doc, skip_none=False):
             inner_doc = doc.get(k)
             if not isinstance(inner_doc, collections.Mapping):
                 doc[k] = {}
-            doc[k] = update_recursive(doc[k], v, skip_none)
+            update_recursive(doc[k], v, skip_none)
         elif v is None and skip_none:
             continue
         else:
@@ -59,6 +59,21 @@ def walk(d, field_name=None):
         else:
             yield (u'%s.%s' % (field_name, key) if field_name else key,
                    value)
+
+def map_dict(dict, fn):
+    new_dict = {}
+    for key, value in dict.iteritems():
+        if isinstance(value, collections.MutableMapping):
+            value = map_dict(value, fn)
+        new_key, new_value = fn(key, value)
+        new_dict[new_key] = new_value
+    return new_dict
+
+def without(d, exclude_keys):
+    for key in exclude_keys:
+        if key in d:
+            del d[key]
+    return d
 
 def _get_container_and_key(doc, key):
     container = doc
@@ -121,7 +136,7 @@ def setitem(doc, key, value):
                     dict.__setitem__(container, key, dict())
             container = dict.__getitem__(container, key)
 
-    dict.__setitem__(container, key, value)
+    container.__setitem__(key, value)
 
 def delitem(doc, key):
     container, key = _get_container_and_key(doc, key)

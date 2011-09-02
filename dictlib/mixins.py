@@ -1,5 +1,5 @@
 from UserDict import DictMixin
-from dictlib.utils import setitem, getitem, delitem, contains
+from dictlib.utils import setitem, getitem, delitem, contains, walk
 
 __all__ = (u'DotNotationAdapter', u'DotNotationMixin', u'ObjectMappingAdapter', 
            u'ObjectMappingMixin')
@@ -23,6 +23,10 @@ class DotNotationAdapter(AbstractAdapter):
         
     def keys(self):
         return self._doc.keys()
+    
+    def walk(self):
+        for key, value in walk(self):
+            yield key, value
 
 class DotNotationMixin(object):
     """ Return a field by `name`. This method can be used both for dotted
