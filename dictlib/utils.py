@@ -27,7 +27,7 @@ def update_recursive(doc, update_doc, skip_none=False):
     :param doc: The dictionary to update; will modified in-place
     :param update_doc: The update_doc to update the dictionary with
     :param skip_none: if True, do not update values which would become None
-        in the result.
+    in the result.
     :returns: The updated dictionary `doc`
     """
     for k, v in update_doc.iteritems():
@@ -49,7 +49,7 @@ def walk(d, field_name=None):
     
     :param d: A dictionary (nested dictionary or flat dot notation or even mixed)
     :param field_name: Optional parameter to use as initial prefix for dotted
-        path
+    path
     """ 
     for key, value in d.iteritems():
         assert u'.' not in key, u'walk() doesn\'t accept key in dot notation: %s' % key
@@ -60,89 +60,139 @@ def walk(d, field_name=None):
             yield (u'%s.%s' % (field_name, key) if field_name else key,
                    value)
 
-def map_dict(dict, fn):
+def map_dict(doc, fn):
+    """ Return a new directory where each key/value pair is replaced by the
+    result `(key, value)` tuple of the mapping function `fn`.
+    
+    As an example for encoding all unicode keys in a dictionary to UTF-8
+    encoded byte-strings:
+    >>> d = {u'a': {u'b': 42}}
+    >>> map_dict(d, lambda k,v: (unicode(k) if type(k) is unicode else k, v))
+    {'a': {'b': 42}}
+    
+    :param doc: A dictionary to apply the mapping function to.
+    :param fn: A mapping function which has the signature `fn(key,value)->(key,value)`
+    """
     new_dict = {}
-    for key, value in dict.iteritems():
-        if isinstance(value, collections.MutableMapping):
-            value = map_dict(value, fn)
-        new_key, new_value = fn(key, value)
+    for key, value in doc.iteritems():
+        if isinstance(value, collections.Mapping):
+            new_value = map_dict(value, fn)
+            new_key, _ = fn(key, None)
+        else:
+            new_key, new_value = fn(key, value)
         new_dict[new_key] = new_value
     return new_dict
 
-def without(d, exclude_keys):
-    for key in exclude_keys:
-        if key in d:
-            del d[key]
-    return d
+
 
 def _get_container_and_key(doc, key):
+    """ For a (possibly) dotted `key`, return the value in `doc`. 
+    """ 
     container = doc
     while u'.' in key:
-        key, sep, rest = key.partition(u'.')
+        key, _, rest = key.partition(u'.')
         try:
-            key = int(key)
+            index = int(key)
+            container = container.__getitem__(index)
         except ValueError:
-            pass
-    
-        if key not in container.keys():
-            raise KeyError()
-        
-        if rest:
+            if key not in container.keys():
+                raise KeyError()
             container = container.__getitem__(key)
-            key = rest
-            
-    return container, key
+        key = rest
 
+    try:         
+        return container, int(key)
+    except ValueError:
+        return container, key
 
 def getitem(doc, key):
     """ Get the value of `key` in dictionary `doc` (optionally in dotted
     notation).
         
     Examples for keys of dictionary `doc`:
-     * doc['a'] -> doc['a']
-     * doc['a.b'] -> doc['a']['b']  # b is interpreted as dictionary key
-     * doc['a.2'] -> doc['a'][2]    # 1 is interpreted as list index
+     - doc['a'] -> doc['a']
+     - doc['a.b'] -> doc['a']['b']  # b is interpreted as dictionary key
+     - doc['a.2'] -> doc['a'][2]    # 1 is interpreted as list index
     """
     container, key = _get_container_and_key(doc, key)
 
     # Make sure we don't get in the way of subclass implementations of 
     # __getitem__()
-    return dict.__getitem__(container, key)
+    return container.__getitem__(key)
+
+def throws(excs, f, *args, **kwargs):
+    """ Execute `f` with the `args` and `kwargs` as parameters and return 
+    `True` if the call raised an exception in `exc`. Return `False` if `f`
+    returned without an exception. If an exception not in `excs` is raised,
+    it will be re-raised.
+    
+    :param excs: A list of exception classes or a single exception class
+    :param f: A callable
+    :param *args: Any non-keyword arguments
+    :param *kwargs: Any keyword arguments
+    """
+    if not isinstance(excs, collections.Sequence):
+        excs = [excs]
+    try:
+        f(*args, **kwargs)
+        return False    
+    except Exception as e:
+        if e.__class__ in excs:
+            return True
+        else:
+            raise e
 
 def setitem(doc, key, value):
-    """ Set the value of `key` in dictionary `doc` (optionally in dotted notation).
+    """ Set the value of `key` in dictionary `doc` (optionally in dotted 
+    notation).
+    
+    :raises KeyError: If the `key` was not found in `doc`
     """
     container = doc
     rest = key
     while rest:
-        key, sep, rest = rest.partition(u'.')
+        key, _, rest = rest.partition(u'.')
         try:
             key = int(key)
         except ValueError:
             pass
         
         if rest:
-            rest_key, sep, rest_rest = rest.partition(u'.')
-            try:
-                index = int(rest_key)
+            rest_key, _, _ = rest.partition(u'.')
+            # Handle non-existing sub-container
+            if throws([IndexError, KeyError], container.__getitem__, key):
                 try:
-                    sub_container = container.__getitem__(key)
-                    cnt_len = len(sub_container)
-                    sub_container[cnt_len:index+1] = [None]*(index+1-cnt_len)
-                except KeyError:
-                    dict.__setitem__(container, key, [None]*(index+1))
-            except ValueError:
-                if key not in container.keys():
-                    dict.__setitem__(container, key, dict())
-            container = dict.__getitem__(container, key)
+                    # Check if sub-key is integer
+                    int(rest_key)
+                    # If it is, create an empty list
+                    sub_container = list()
+                except ValueError:
+                    # Assume it's a dict
+                    sub_container = dict()
 
-    container.__setitem__(key, value)
+                if isinstance(container, collections.MutableSequence) and key == len(container):
+                    container.__setslice__(key, key+1, [sub_container])
+                else:
+                    container.__setitem__(key, sub_container)
+            
+            container = container.__getitem__(key)
+
+    if isinstance(container, collections.MutableSequence) and key == len(container):
+        container.__setslice__(key, key+1, [value])
+    else:
+        container.__setitem__(key, value)
 
 def delitem(doc, key):
     container, key = _get_container_and_key(doc, key)
 
-    dict.__delitem__(container, key)
+    container.__delitem__(key)
 
 def contains(doc, key):
     container, key = _get_container_and_key(doc, key)
-    return dict.__contains__(container, key)
+    return container.__contains__(key)
+
+#def without(d, exclude_keys):
+#    for key in exclude_keys:
+#        if key in d:
+#            del d[key]
+#    return d

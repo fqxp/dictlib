@@ -1,6 +1,5 @@
 from dictlib.exceptions import ValidationError, SchemaFieldNotFound
 from dictlib.utils import update_recursive
-from pymongo.objectid import ObjectId
 import collections
 import datetime
 import re
@@ -15,28 +14,29 @@ class Field(object):
     can_be_none = False
     description = None
     title = None
+    optional = False
     
     """ The base class for fields in a `DictSchema`.
     """
-    def __init__(self, optional=False, default=None, can_be_none=None,
+    def __init__(self, optional=None, default=None, can_be_none=None,
                  title=None, description=None):
         """ Constructor.
          
         :param optional: Whether this field must exist (`False`) or may not
-            exist (`True`).
+        exist (`True`).
         :param default: The default value if this field is unset (default: `None`).
         :param can_be_none: Whether the value of this field may have a value of
-            `None`.
+        `None`.
         :param title: An optional title for this field.
         :param description: An optional long description of this field.
         """
-        self.optional = optional if optional is not None else optional
+        self.optional = optional if optional is not None else self.optional
         self.default = default if default is not None else self.default
         self.can_be_none = can_be_none if can_be_none is not None else self.can_be_none
         self.title = title if title is not None else self.title
         self.description = description if description is not None else self.description
     
-    def validate(self, value, field_name, partial=False):
+    def validate(self, value, field_name=u'', partial=False):
         """ Validate the field. Subclasses should invoke their parent's
         `validate()` method subsequently.
         
@@ -59,11 +59,12 @@ class Field(object):
         subclass if your type is not normally representable in JSON.
 
         :param value: The value to convert to JSON format.
-        """ 
+        """
         return value
     
     def __unicode__(self):
         return u'<%s: optional=%r default=%r can_be_none=%r title=%s description=%s>' % (
+                self.__class__.__name__,
                 self.optional, self.default, self.can_be_none, self.title,
                 self.description)
 
@@ -85,9 +86,6 @@ class TypeField(Field):
             raise ValidationError(u'Field %s: Value %r has wrong type %s' %
                                   (field_name, value, type(value)))
 
-    def __unicode__(self):
-        return u'<TypeField: type=%s>' % self.type
-    
 class FieldField(TypeField):
     """ A `FieldField` can only have a `Field` instance as a value. This is
     used to convert schema definitions themselves.
@@ -189,6 +187,18 @@ class UnicodeField(TypeField):
             if self.match and not self.match.match(value):
                 raise ValidationError(u'Field %s: Value %s has wrong format' %
                                       (field_name, value))
+                
+    def from_json(self, v):
+        if type(v) is str:
+            return v.decode(u'utf-8')
+        else:
+            return v
+    
+    def to_json(self, v):
+        if type(v) is unicode:
+            return v.encode(u'utf-8')
+        else:
+            return v
             
 class UuidField(UnicodeField):
     """ A field that only may hold UUID4 values, i. e. 256-bit values as
@@ -197,31 +207,19 @@ class UuidField(UnicodeField):
     match = re.compile(ur'[0-9a-f]{32}')
     length = 32
 
-class ObjectIdField(TypeField):
-    """ A schema field for `ObjectId` values.
-    
-    Values are JSON-encoded to unicode values.
-    """
-    type = ObjectId
-    
-    def from_json(self, v):
-        return ObjectId(v) if v else None
-    
-    def to_json(self, v):
-        return unicode(v) if v else None
-
-class AbstractDatetimeField(TypeField):
+class BaseDatetimeField(TypeField):
     """ A base class for schema fields for `datetime` values.
     
     Values are JSON-encoded to unicode values in ISO date/time format.
     """
     def from_json(self, v):
-        return self.type(*time.strptime(v, self.dt_format)[self.struct_time_index[0]:self.struct_time_index[1]])
+        timetuple = time.strptime(v, self.dt_format)
+        return self.type(*timetuple[self.struct_time_index[0]:self.struct_time_index[1]])
     
     def to_json(self, v):
         return v.strftime(self.dt_format)
 
-class DatetimeField(AbstractDatetimeField):
+class DatetimeField(BaseDatetimeField):
     """ A schema field for date/time values. JSON datetimes must be strings in
     the format *YYYY-MM-DDThh-mm-ssZ*.
     """
@@ -229,7 +227,7 @@ class DatetimeField(AbstractDatetimeField):
     dt_format = u'%Y-%m-%dT%H:%M:%SZ'
     struct_time_index = (0, 6)
 
-class DateField(AbstractDatetimeField):
+class DateField(BaseDatetimeField):
     """ A schema field for date/time values. JSON datetimes must be strings in
     the format *YYYY-MM-DD*.
     """
@@ -237,7 +235,7 @@ class DateField(AbstractDatetimeField):
     dt_format = u'%Y-%m-%d'
     struct_time_index = (0, 3)
 
-class TimeField(AbstractDatetimeField):
+class TimeField(BaseDatetimeField):
     """ A schema field for date/time values. JSON datetimes must be strings in
     the format *hh-mm-ss*.
     """
@@ -245,31 +243,12 @@ class TimeField(AbstractDatetimeField):
     dt_format = u'%H:%M:%S'
     struct_time_index = (3, 6)
 
-class EnumField(Field):
-    """ A scheme field accepting values from a given list of possible values 
-    only. 
-    
-    :todo: Add enum functionality to `Field` class and eliminate this class.
-    """
-    def __init__(self, *args, **kwargs):
-        """ Constructor. The list of non-keyword arguments provided is the list
-        of possible values for this field. Keyword arguments are as in the 
-        superclasses.
-        """
-        super(EnumField, self).__init__(**kwargs)
-        self.values = args
-        
-    def validate(self, field_value, field_name=None, partial=False):
-        if field_value not in self.values:
-            raise ValidationError(u'Field %s: Value %r not allowed' %
-                                  (field_name, field_value))
-    
 class ListField(TypeField):
     """ A schema field for lists.
     """
-    type = collections.Sequence
+    type = list
 
-    def __init__(self, fields=None, optional=False, default=[], min_len=0, 
+    def __init__(self, fields=None, optional=False, default=None, min_len=0, 
                  max_len=None, can_be_none=False, title=None, description=None):
         """ Constructor.
 
@@ -278,13 +257,15 @@ class ListField(TypeField):
         :param default: A default value for this field. Default: `[]`.
         :param min_len: The minimum length of the list. Default: `0`.
         :param max_len: The maximum length of the list. `None` means infinite.
-            Default: `None`.
+        Default: `None`.
         :param can_be_none: Whether the value of the field may be `None` instead
-            of a list.
+        of a list.
         """
-        super(ListField, self).__init__(optional=optional, default=default,
+        super(ListField, self).__init__(optional=optional, default=default or [],
                                         can_be_none=can_be_none)
-        if not isinstance(fields, collections.Sequence):
+        if fields is None:
+            fields = [AnyField()]
+        elif not isinstance(fields, collections.Sequence):
             fields = [fields]
         self.fields = fields
         self.min_len = min_len
@@ -313,7 +294,7 @@ class ListField(TypeField):
         
     def validate(self, field_value, field_name=None, partial=False):
         super(ListField, self).validate(field_value, field_name)
-        
+
         # Validate list length
         if self.min_len is not None and len(field_value) < self.min_len:
             raise ValidationError(u'Field %s: List has too few elements (%d)' % 
@@ -322,25 +303,19 @@ class ListField(TypeField):
             raise ValidationError(u'Field %s: List has too many elements (%d)'
                                   % (field_name, len(field_value)))
         
+        # Check type of each list item
         for i, value in enumerate(field_value):
-            validated = False
+            is_valid = False
             for field in self.fields:
-                if hasattr(field, u'type') and isinstance(value, field.type):
+                #if hasattr(field, u'type') and isinstance(value, field.type):
+                try:
                     field.validate(value, field_name=u'%s[%d]' % (field_name, i))
-                    validated = True
+                    is_valid = True
                     break
+                except ValidationError:
+                    pass
 
-            # Extra-check enum fields because they have no type field to 
-            # check against
-            # When adding an 'enum' option to the `Field` class, this stuff
-            # is not needed anymore.
-            if not validated:
-                for enum_field in filter(lambda t: t.__class__ is EnumField, self.fields):
-                    enum_field.validate(value, field_name='%s[%d]' % (field_name, i))
-                    validated = True
-                    break
-                
-            if not validated:
+            if not is_valid:
                 raise ValidationError(u'Field %s[%d]: field_value %r has none of the listed fields' %
                                       (field_name, i, value))
 
@@ -408,11 +383,11 @@ class DictField(TypeField):
                     raise ValidationError(u'Field \'%s\' is missing' % full_field_name)
 
     def from_json(self, v):
-        return dict((key, self.get_field(key).from_json(value)) 
+        return dict((unicode(key), self.get_field(key).from_json(value)) 
                     for key, value in v.iteritems())
     
     def to_json(self, v):
-        return dict((key, self.get_field(key).to_json(value)) 
+        return dict((key.encode(u'utf-8'), self.get_field(key).to_json(value))
                     for key, value in v.iteritems())
 
     def get_field(self, key):
@@ -433,46 +408,32 @@ class DictField(TypeField):
         """ Returns the mangled schema definition.
         """
         return self._schema
-    
-#    def __getitem__(self, key):
-#        return self._schema[key]
-#    
-#    def __setitem__(self, key, value):
-#        self._schema[key] = value
-#        
-#    def __delitem__(self, key):
-#        del self._schema[key]
-#        
-#    def __len__(self):
-#        return len(self._schema)
-#    
-#    def __iter__(self):
-#        return iter(self._schema)
 
 class Schema(DictField):
     def __init__(self, schema=None, title=None, description=None):
         """
         :param schema: A schema definition. This is a dictionary with field name/
-            field type to `Field` instance mapping, possibly nested.
+        field type to `Field` instance mapping, possibly nested.
         :see: Field
         """
         super(Schema, self).__init__(schema, optional=False, default={}, can_be_none=False,
                                      title=title, description=description)
 
-    def create(self, initial={}, _subschema=None):
+    def create(self, initial=None, _subschema=None):
         """ Create a document from this schema by using the initial values from
         the schema, possibly overwriting them with the initial values from the
         `initial` parameter and leaving out any optional fields.
         
         :initial: A dictionary of initial values which overrule the initial
-            values from the schema description. Default: empty.
+        values from the schema description. Default: empty.
         :return: A newly created dictionary matching the structure of the schema.
         """
         schema = _subschema or self._schema
+        initial = initial if initial is not None else {}
         doc = {}
         
         for key, field in schema.iteritems():
-            # Do not create create default dictionary if key is a type, e.g. 
+            # Do not create default dictionary if key is a type, e.g. 
             # unicode, since we don't know a key name
             if isinstance(key, types.TypeType):
                 continue

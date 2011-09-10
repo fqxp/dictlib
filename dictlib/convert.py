@@ -1,7 +1,7 @@
-from dictlib.mixins import DotNotationAdapter
 from dictlib.utils import walk
 from dictlib.schema import AbstractNumericField, ListField, UnicodeField,\
-    DictField, Schema, FieldField, NoneField, AnyField, UuidField
+    DictField, Schema, FieldField, NoneField, AnyField
+from dictlib.mapping import DotNotationAdapter
 
 """
 DictField({
@@ -28,61 +28,72 @@ class Converter(object):
     # Fields to exclude when converting to JSON (in dot notation)
     exclude = []
     rename = []
+    factory = lambda o: o
     
-    def __init__(self, schema, exclude=[], rename=(), factory=lambda o: o):
-        self.schema = schema
-        self.exclude.extend(exclude)
-        self.rename.extend(rename)
-        self.factory = factory
+    def __init__(self, exclude=None, rename=None, factory=None):
+        self.exclude.extend(exclude or [])
+        self.rename.extend(rename or [])
+        self.factory = factory if factory is not None else self.factory
         self.rename_inv = list((v, k) for k, v in self.rename)
 
     def from_schema(self, doc):
         # Exclude fields
-        dot_doc = DotNotationAdapter(doc)
-        for key, value in dot_doc.walk():
-            dot_doc[key] = self.map_from(key, value)
-            if self.exclude_field(dot_doc, key):
-                del dot_doc[key]
+        src_doc = DotNotationAdapter(doc)
+        dest_doc = DotNotationAdapter()
+        for key, value in walk(src_doc):
+            if self.exclude_field(src_doc, key):
+                continue
+            dest_doc[key] = self.map_from(key, value)
         # Rename keys
         for rename_key, rename_value in self.rename:
-            if rename_key in dot_doc:
-                dot_doc[rename_value] = dot_doc[rename_key]
-                del dot_doc[rename_key]
-        return doc
+            if rename_key in dest_doc:
+                dest_doc[rename_value] = dest_doc[rename_key]
+                del dest_doc[rename_key]
+        return dest_doc.doc
     
     def to_schema(self, doc):
+        new_doc = DotNotationAdapter()
         for key, value in walk(doc):
-            doc[key] = self.map_to(key, value)
+            new_doc[key] = self.map_to(key, value)
         for rename_key, rename_value in self.rename_inv:
-            if rename_key in doc:
-                doc[rename_value] = doc[rename_key]
-                del doc[rename_key]
-        return doc
+            if rename_key in new_doc:
+                new_doc[rename_value] = new_doc[rename_key]
+                del new_doc[rename_key]
+        return new_doc.doc
     
     def exclude_field(self, json_doc, key):
-        return False
+        return key in self.exclude
     
     def map_from(self, key, value):
         return value
-
+    
     def map_to(self, key, value):
         return value
     
 class JsonConverter(Converter):
-    def to_schema(self, json_doc):
-        return self.factory(super(JsonConverter, self).to_schema(self.schema.from_json(json_doc)))
+    """ A `Converter` to convert a schemed dictionary to a JSON-stringifiable 
+    dictionary.
+    """
+    def __init__(self, schema, **kwargs):
+        """ Constructor. 
+        :param schema: A schema instance
+        :param kwargs: Any keyword arguments to the `Converter` constructor
+        """
+        super(JsonConverter, self).__init__(**kwargs)
+        self.schema = schema
 
-    def from_schema(self, doc):
-        return super(JsonConverter, self).from_schema(dict(self.schema.to_json(doc)))
+    def map_from(self, key, value):
+        """ Convert the `value` from the internal Nete document representation 
+        to the Nete API document representation. 
+        """
+        return self.schema.get_field(key).to_json(value)
 
-    def exclude_field(self, json_doc, key):
-        return key in self.exclude
+    def map_to(self, key, value):
+        """ Convert the `value` from the Nete API document representation to the
+        internal Nete document representation.
+        """
+        return self.schema.get_field(key).from_json(value)
 
-class JsonSchemaSchema(Schema):
-    schema = {
-        unicode: FieldField(optional=True),
-    }
-    
 class JsonSchemaConverter(Converter):
     """ A basic `Schema` to JSON Schema converter.
     
@@ -93,8 +104,8 @@ class JsonSchemaConverter(Converter):
     * enum on any list
     * AnyField (partially)
     """
-    def __init__(self):
-        super(JsonSchemaConverter, self).__init__(JsonSchemaSchema(), exclude=[], rename=(), factory=dict)
+    schema = Schema({unicode: FieldField(optional=True)})
+    factory = dict
     
     def to_json(self, schema):
         schema = Schema(super(JsonSchemaConverter, self).to_json(schema.get_schema()))
@@ -142,4 +153,4 @@ class JsonSchemaConverter(Converter):
         return json_schema_doc
     
     def from_json(self, json_schema_doc):
-        pass
+        raise NotImplementedError(u'from_json for JSON schemas is not yet implemented')
