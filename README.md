@@ -2,6 +2,7 @@ dictlib
 =======
 
 Features:
+
  - schema definition
  - validating a dictionary against a schema
  - creating a dictionary by schema rules
