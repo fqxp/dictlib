@@ -53,12 +53,11 @@ def walk(d, field_name=None):
     """ 
     for key, value in d.iteritems():
         assert u'.' not in key, u'walk() doesn\'t accept key in dot notation: %s' % key
+        yield (u'%s.%s' % (field_name, key) if field_name else key,
+               value)
         if hasattr(value, u'iteritems'):
             for pair in walk(value, key):
                 yield pair
-        else:
-            yield (u'%s.%s' % (field_name, key) if field_name else key,
-                   value)
 
 def map_dict(doc, fn):
     """ Return a new directory where each key/value pair is replaced by the
@@ -151,14 +150,14 @@ def setitem(doc, key, value):
     container = doc
     rest = key
     while rest:
-        key, _, rest = rest.partition(u'.')
+        key, _, rest = rest.partition('.')
         try:
             key = int(key)
         except ValueError:
             pass
         
         if rest:
-            rest_key, _, _ = rest.partition(u'.')
+            rest_key, _, _ = rest.partition('.')
             # Handle non-existing sub-container
             if throws([IndexError, KeyError], container.__getitem__, key):
                 try:

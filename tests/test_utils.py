@@ -20,7 +20,9 @@ class TestUtils(unittest.TestCase):
         
     def test_walk(self):
         self.assertEquals([(u'a', 1)], list(walk({'a': 1})))
-        self.assertEquals([(u'a.b', 1)], list(walk({u'a': {'b': 1}})))
+        # test if keys are yielded
+        self.assertEquals([(u'a', {u'b': 1}), (u'a.b', 1)], 
+                          list(walk({u'a': {'b': 1}})))
         result = list(walk({u'a': {'b': 1, u'c': 2}}))
         self.assertTrue((u'a.b', 1) in result)
         self.assertTrue((u'a.c', 2) in result)

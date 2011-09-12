@@ -410,6 +410,10 @@ class DictField(TypeField):
         return self._schema
 
 class Schema(DictField):
+    """ A definition of a schema. Either derive from this class and set the
+    `schema` attribute statically or use `Schema` directly and provide a
+    `schema` argument.
+    """
     def __init__(self, schema=None, title=None, description=None):
         """
         :param schema: A schema definition. This is a dictionary with field name/

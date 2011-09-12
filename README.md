@@ -8,12 +8,18 @@ Features:
  - mapping dictionaries to Python objects (adapter or mixin)
  - dot notation for nested dictionaries (adapter or mixin)
 
-Plans:
+To do
+-----
+ - documentation (with sphinx):
+   - tutorial
+   - API reference
+   - examples (e.g., building a simple db wrapper)
+
+Ideas
+-----
  - dict comparison
  - dict merge by definable criteria
  - bidirectional dict (?)
- - documentation, examples for building a db wrapper with dictionaries as
-   objects
  - sorted dictionaries: by key, by value, by lambda result
  - standard converters: JSON Schema, schema classes by other frameworks, e.g. 
    Django (?)
