@@ -26,6 +26,9 @@ import re
 import time
 import types
 
+class SchemaDefinitionError(Exception):
+    pass
+
 class Field(object):
     """ The base class for schema fields. Do not use this class directly, but
     only its subclasses.
@@ -227,6 +230,12 @@ class UuidField(UnicodeField):
     match = re.compile(ur'[0-9a-f]{32}')
     length = 32
 
+class EmailField(UnicodeField):
+    """ A field that only may hold UUID4 values, i. e. 256-bit values as
+    32-character hexedecimal strings.
+    """
+    match = re.compile(ur'.+@.+')
+
 class BaseDatetimeField(TypeField):
     """ A base class for schema fields for `datetime` values.
     
@@ -346,24 +355,55 @@ class DictField(TypeField):
     """
     type = collections.MutableMapping
     _schema = {}
-    
+
     def __init__(self, schema=None, **kwargs):
         super(DictField, self).__init__(**kwargs)
 
         # Update schema definition from base classes, enabling sub-classing
         # of schemas
-        src_schema = {}
-        for cls in reversed(filter(lambda cls: hasattr(cls, u'schema'), self.__class__.__mro__)):
-            update_recursive(src_schema, cls.schema)
+        self._schema = {}
+        for cls in reversed(filter(lambda cls: hasattr(cls, u'schema'), 
+                                   self.__class__.__mro__)):
+            if not isinstance(cls.schema, initial):
+                raise SchemaDefinitionError(u'schema attribute in %s '
+                                            u'is not a initial, but should be' %
+                                            cls.__name__)
+            self.extend(cls.schema)
         if schema:
-            update_recursive(src_schema, schema)
-        self._schema = self._mangle_schema(src_schema)
+            self.extend(schema)
+
+    def extend(self, other_schema):
+        """ Extend (overwrite) the current schema with fields from another
+        schema.
+        
+        :param other_schema: Either a `DictField` instance or a dict schema
+        definition
+        :raises SchemaDefinitionError: If there is an error in the schema 
+        definition
+        """
+        if isinstance(other_schema, Schema):
+            other_schema = other_schema.schema
+        for key, field in other_schema.iteritems():
+            if not isinstance(field, (Field, dict)):
+                raise SchemaDefinitionError(u'Schema attribute %s is not a Field' %
+                                            key)
+            # Recursively 
+            if isinstance(field, (DictField, dict)) and \
+                    key in self._schema and \
+                    isinstance(self._schema[key], DictField):
+                self._schema[key].extend(field._schema)
+            else:
+                self._schema[key] = field
+
+        self._schema = self._mangle_schema(self._schema)
 
     def _mangle_schema(self, schema):
         # Take care that _mangle_schema(_mangle_schema(schema)) == _mangle_schema(schema)
         # for all values of schema
         # Convert all dictionaries in the schema definition by DictFields
         mangled_schema = {}
+        if isinstance(schema, DictField):
+            schema = schema._schema
         for key, value in schema.iteritems():
             if isinstance(value, dict):
                 mangled_subschema = self._mangle_schema(value)
@@ -403,8 +443,11 @@ class DictField(TypeField):
                     raise ValidationError(u'Field \'%s\' is missing' % full_field_name)
 
     def from_json(self, v):
-        return dict((unicode(key), self.get_field(key).from_json(value)) 
-                    for key, value in v.iteritems())
+        doc = {}
+        for key, value in v.iteritems():
+            key = key.decode(u'utf-8') if isinstance(key, str) else key
+            doc[key] = self.get_field(key).from_json(value)
+        return doc
     
     def to_json(self, v):
         return dict((key.encode(u'utf-8'), self.get_field(key).to_json(value))

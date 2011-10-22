@@ -150,6 +150,7 @@ def setitem(doc, key, value):
     notation).
     
     :raises KeyError: If the `key` was not found in `doc`
+    :todo: Make this much faster
     """
     container = doc
     rest = key
