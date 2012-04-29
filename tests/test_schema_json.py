@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# -*- coding: utf-8 -*-
 #
 # This file is part of dictlib.
 #
@@ -28,114 +27,107 @@ import uuid
 class TestSchemaJson(unittest.TestCase):
     def test_Field_json_methods(self):
         f = Field()
-        self.assertEquals(u'hello world', 
-                          f.from_json(f.to_json(u'hello world')))
-        self.assertEquals(u'hello world', 
-                          f.to_json(f.from_json(u'hello world')))
+
+        self.assertEquals(u'hello world', f.from_json(f.to_json(u'hello world')))
+        self.assertEquals(u'hello world', f.to_json(f.from_json(u'hello world')))
 
     def test_NoneField_json_methods(self):
         f = NoneField()
-        self.assertEquals(None, 
-                          f.from_json(f.to_json(None)))
-        self.assertEquals(None, 
-                          f.to_json(f.from_json(None)))
+
+        self.assertEquals(None, f.from_json(f.to_json(None)))
+        self.assertEquals(None, f.to_json(f.from_json(None)))
 
     def test_IntField_json_methods(self):
         f = IntField()
-        self.assertEquals(1234567890, 
-                          f.from_json(f.to_json(1234567890)))
-        self.assertEquals(1234567890, 
-                          f.to_json(f.from_json(1234567890)))
+
+        self.assertEquals(1234567890, f.from_json(f.to_json(1234567890)))
+        self.assertEquals(1234567890, f.to_json(f.from_json(1234567890)))
 
     def test_LongField_json_methods(self):
         f = LongField()
-        self.assertEquals(1234567890L, 
-                          f.from_json(f.to_json(1234567890L)))
-        self.assertEquals(1234567890, 
-                          f.to_json(f.from_json(1234567890L)))
 
-    def test_FloatField_json_methods(self):
+        self.assertEquals(1234567890L, f.from_json(f.to_json(1234567890L)))
+        self.assertEquals(1234567890, f.to_json(f.from_json(1234567890L)))
+
+    def test_FloatField_from_json_converts_byte_string_to_float(self):
         f = FloatField()
-        self.assertEquals(1.234567890, 
-                          f.from_json(f.to_json(1.234567890)))
-        self.assertEquals(1.234567890, 
-                          f.to_json(f.from_json(1.234567890)))
 
-    def test_UnicodeField_json_methods(self):
-        # what's important here is the UTF-8 encoding/decoding
+        self.assertEquals('1.234567890', f.from_json('1.234567890'))
+
+    def test_FloatField_to_json_does_not_change_value(self):
+        f = FloatField()
+
+        self.assertEquals(1.234567890, f.to_json(1.234567890))
+
+    def test_UnicodeField_from_json_converts_byte_string_to_unicode_string(self):
         f = UnicodeField()
-        self.assertEquals(u'we are motörhead', 
-                          f.from_json(f.to_json(u'we are motörhead')))
-        self.assertEquals('we are motörhead', 
-                          f.to_json(f.from_json('we are motörhead')))
-        self.assertEquals(str, 
-                          type(f.to_json(f.from_json('we are motörhead'))))
-        self.assertEquals(str, 
-                          type(f.to_json(f.from_json(u'we are motörhead'))))
-        self.assertEquals(str,
-                          type(f.to_json(u'we are motörhead')))
 
-    def test_UuidField_json_methods(self):
+        self.assertEquals(u'we are motörhead', f.from_json('we are motörhead'))
+
+    def test_UnicodeField_to_json_converts_unicode_string_to_byte_string(self):
+        f = UnicodeField()
+
+        self.assertEquals('we are motörhead', f.to_json(u'we are motörhead'))
+        self.assertEquals(str, type(f.to_json(u'we are motörhead')))
+
+    def test_UuidField_from_json_converts_uuid_to_unicode_string(self):
         f = UuidField()
-        a_uuid = uuid.uuid4().hex
-        self.assertEquals(a_uuid, 
-                          f.from_json(f.to_json(a_uuid)))
-        self.assertEquals(a_uuid, 
-                          f.to_json(f.from_json(a_uuid)))
-        
-    def test_DatetimeField_json_methods(self):
+
+        self.assertEquals(u'3a752ef0439f4f74a283baf359dd7e7b', f.from_json('3a752ef0439f4f74a283baf359dd7e7b'))
+
+    def test_UuidField_to_json_converts_uuid_to_unicode_string(self):
+        f = UuidField()
+
+        self.assertEquals('3a752ef0439f4f74a283baf359dd7e7b', f.to_json(u'3a752ef0439f4f74a283baf359dd7e7b'))
+
+    def test_DatetimeField_to_json_converts_isocoded_datetime_to_datetime_object(self):
         f = DatetimeField()
-        now = datetime.datetime.utcnow().replace(microsecond=0)
-        self.assertEquals(now, 
-                          f.from_json(f.to_json(now)))
-        now_json = '2011-07-10T20:00:00Z'
-        self.assertEquals(now_json, 
-                          f.to_json(f.from_json(now_json)))
-        
-    def test_DateField_json_methods(self):
+
+        dt = datetime.datetime(2012, 4, 29, 12, 24, 36)
+        self.assertEquals(dt, f.from_json('2012-04-29T12:24:36Z'))
+
+    def test_DatetimeField_from_json_converts_datetime_object_to_isocoded_datetime_object(self):
+        f = DatetimeField()
+
+        dt = datetime.datetime(2012, 4, 29, 12, 24, 36)
+        self.assertEquals('2012-04-29T12:24:36Z', f.to_json(dt))
+
+    def test_DateField_to_json_converts_isocoded_date_to_date_object(self):
         f = DateField()
-        now = datetime.datetime.utcnow().date()
-        self.assertEquals(now, 
-                          f.from_json(f.to_json(now)))
-        now_json = '2011-07-10'
-        self.assertEquals(now_json, 
-                          f.to_json(f.from_json(now_json)))
-        
-    def test_TimeField_json_methods(self):
+
+        self.assertEquals(datetime.date(1975, 7, 10), f.from_json('1975-07-10'))
+
+    def test_DateField_from_json_converts_date_object_to_isocoded_date(self):
+        f = DateField()
+
+        self.assertEquals('1975-07-10', f.to_json(datetime.datetime(1975, 7, 10)))
+
+    def test_TimeField_to_json_converts_time_object_to_isocoded_time(self):
         f = TimeField()
-        now = datetime.datetime.utcnow().time().replace(microsecond=0)
-        self.assertEquals(now, 
-                          f.from_json(f.to_json(now)))
-        now_json = '20:00:00'
-        self.assertEquals(now_json, 
-                          f.to_json(f.from_json(now_json)))
-        
-    def test_ListField_json_methods(self):
-        f = ListField(UnicodeField())
-        self.assertEquals([u'hello', u'world'], 
-                          f.from_json(f.to_json([u'hello', u'world'])))
-        self.assertEquals(['hello', 'world'], 
-                          f.from_json(f.to_json(['hello', 'world'])))
-        
+
+        self.assertEquals('12:24:36', f.to_json(datetime.time(12, 24, 36)))
+
+    def test_TimeField_from_json_converts_isocoded_time_to_time_object(self):
+        f = TimeField()
+
+        self.assertEquals(datetime.time(12, 24, 36), f.from_json('12:24:36'))
+
+    def test_ListField_to_json_converts_list_with_unicode_strings_to_byte_strings(self):
         f = ListField(DatetimeField(), UnicodeField(), IntField())
-        self.assertEquals([u'hello', 42], 
-                          f.from_json(f.to_json([u'hello', 42])))
-        self.assertEquals(['hello', 42], 
-                          f.from_json(f.to_json(['hello', 42])))
-        
-    def test_DictField_json_methods(self):
+
+        self.assertEquals(['foo', 'bar'], f.to_json([u'foo', u'bar']))
+
+    def test_ListField_from_json_converts_list_with_byte_strings_to_list(self):
+        f = ListField(UnicodeField())
+
+        self.assertEquals([u'hello', u'world'], f.from_json(['hello', 'world']))
+
+    def test_DictField_to_json_converts_unicode_keys_and_values_to_byte_strings(self):
         f = DictField({u'a': UnicodeField()})
-        self.assertEquals({'a': 'hello world'}, 
-                          f.from_json(f.to_json({u'a': u'hello world'})))
-        f = DictField({u'a': {u'b': UnicodeField()}})
-        self.assertEquals({'a': {'b': 'hello world'}}, 
-                          f.from_json(f.to_json({u'a': {u'b': u'hello world'}})))
 
-    def test_field(self):
-        # Any object needs these tests ...
-        self.assertEquals(unicode,
-                          type(unicode(Field())))
+        self.assertEquals({'a': 'hello world'}, f.to_json({u'a': u'hello world'}))
 
-if __name__ == "__main__":
-    #import sys;sys.argv = ['', 'Test.testName']
-    unittest.main()
+    def test_DictField_from_json_converts_byte_string_keys_and_values_to_unicode_strings(self):
+        f = DictField({u'a': UnicodeField()})
+
+        self.assertEquals({u'a': u'foobar'}, f.from_json({'a': 'foobar'}))

@@ -23,10 +23,10 @@ from dictlib.mapping import DotNotationAdapter, DotNotationMixin, \
     ObjectMappingAdapter, ObjectMappingMixin, BaseDictAdapter
 import unittest
 
-class Test(unittest.TestCase):
+class TestMapping(unittest.TestCase):
     def test_DotNotationAdapter(self):
         self._run_DotNotation_tests(DotNotationAdapter)
-        
+
     def test_DotNotationMixin(self):
         class MyDotNotationDict(DotNotationMixin, dict):
             pass
@@ -38,7 +38,7 @@ class Test(unittest.TestCase):
         d[u'a.b'] = 2
         self.assertEquals(2, d[u'a'][u'b'])
         self.assertEquals(2, d[u'a.b'])
-        
+
         d = factory({})
         try:
             self.assertEquals(1, d[u'a.b'])
@@ -49,17 +49,17 @@ class Test(unittest.TestCase):
         self.assertEquals(2, d[u'a'][u'b'])
         self.assertEquals(2, d[u'a.b'])
 
-        # test in and del        
+        # test in and del
         self.assertTrue(u'a.b' in d)
         del d[u'a.b']
         self.assertTrue(u'a.b' not in d)
-        
+
         # test keys()
         self.assertEquals([u'a'], d.keys())
-        
+
         d = factory({u'a': [1, 2, 3]})
         self.assertEquals(2, d[u'a.1'])
-        
+
         d[u'a.3'] = 4
         self.assertEquals(4, d[u'a.3'])
 
@@ -74,7 +74,7 @@ class Test(unittest.TestCase):
         self.assertRaises(KeyError, set_item, d, u'a.6', 6)
         self.assertRaises(KeyError, del_item, d, u'a.6')
 
-        # test lists with dictionaries as elements        
+        # test lists with dictionaries as elements
         d = factory({u'a': [{u'b': u'x'},
                             {u'c': u'y'}]})
         self.assertEquals(u'x', d[u'a.0.b'])
@@ -82,33 +82,33 @@ class Test(unittest.TestCase):
         self.assertRaises(KeyError, get_item, d, u'a.0.z')
         # test non-existing index (2)
         self.assertRaises(KeyError, get_item, d, u'a.2.z')
-        
+
         # test non-existing sub-dict
         d[u'b.d'] = 42
         self.assertEquals(42, d[u'b.d'])
         # test non-existing sub-dict with two recursions
         d[u'b.e.f'] = 666
         self.assertEquals(666, d[u'b.e.f'])
-        
+
         # test non-existing sub-list
         d[u'b.g.0'] = 10
         d[u'b.g.1'] = 11
         self.assertEquals(10, d[u'b.g.0'])
         self.assertEquals(11, d[u'b.g.1'])
-        
+
         # test non-existing sub-list
         d[u'c.0.a'] = 20
         d[u'c.1.a'] = 21
         self.assertEquals(20, d[u'c.0.a'])
         self.assertEquals(21, d[u'c.1.a'])
-        
+
         # test non-existing sub-list with two recursions
         d[u'b.h.i'] = 20
         self.assertEquals(20, d[u'b.h.i'])
-        
+
     def test_ObjectMappingAdapter(self):
         self._run_ObjectMapping_tests(ObjectMappingAdapter)
-        
+
     def test_ObjectMappingMixin(self):
         class MyObjectMappingDict(ObjectMappingMixin, dict):
             pass
@@ -161,14 +161,14 @@ class Test(unittest.TestCase):
             self.fail(u'Should have thrown AttributeError')
         except AttributeError:
             pass
-        
-        # test in and del        
+
+        # test in and del
         d = factory({u'a': {u'b': 42}})
         self.assertTrue(u'a' in d)
         self.assertTrue(u'b' in d.a)
         del d.a[u'b']
         self.assertTrue(u'b' not in d.a)
-        
+
         # test keys()
         self.assertEquals([u'a'], d.keys())
 
@@ -180,19 +180,19 @@ class Test(unittest.TestCase):
 
         dict_cls = type('anonymous dict', (ObjectMappingMixin, DotNotationMixin, dict), {})
         self._run_DotNotation_and_ObjectMapping_tests(dict_cls)
-        
-    def test_ObjectMapping_and_DotNotation(self):        
+
+    def test_ObjectMapping_and_DotNotation(self):
         # Test combination of DotNotationMixin and ObjectMappingMixin in this order
         class MyPowerfulDict2(DotNotationMixin, ObjectMappingMixin, dict):
             pass
         self._run_DotNotation_and_ObjectMapping_tests(MyPowerfulDict2)
-        
+
         dict_cls = type('anonymous dict', (DotNotationMixin, ObjectMappingMixin, dict), {})
         self._run_DotNotation_and_ObjectMapping_tests(dict_cls)
-        
+
         dict_cls = lambda d: ObjectMappingAdapter(DotNotationAdapter(d))
         self._run_DotNotation_and_ObjectMapping_tests(dict_cls)
-        
+
     def _run_DotNotation_and_ObjectMapping_tests(self, factory):
         d = factory({})
         try:

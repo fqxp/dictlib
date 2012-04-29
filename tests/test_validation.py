@@ -22,7 +22,7 @@ from dictlib.exceptions import ValidationError
 from dictlib.schema import Schema, UnicodeField, DictField, LongField, ListField
 import unittest
 
-class Test(unittest.TestCase):
+class TestValidation(unittest.TestCase):
     def test_field_type_check(self):
         schema = Schema({u'text': UnicodeField()})
         self.assertRaises(ValidationError, schema.validate, {u'tag': 666})
@@ -32,38 +32,32 @@ class Test(unittest.TestCase):
         schema.validate({u'text': u'hello world'})
         self.assertRaises(ValidationError, schema.validate, {u'tag': u'greeting'})
 
-    def test_optional_field(self):        
-        schema = Schema({u'text': UnicodeField(),
-                         u'tag': UnicodeField(optional=True)})
+    def test_optional_field(self):
+        schema = Schema({u'text': UnicodeField(), u'tag': UnicodeField(optional=True)})
+
         schema.validate({u'text': u'hello world'})
-        schema.validate({u'text': u'hello world', 
-                         u'tag': u'greeting'})
+        schema.validate({u'text': u'hello world', u'tag': u'greeting'})
 
     def test_empty_doc(self):
         schema = Schema({u'tag': UnicodeField(optional=True)})
         schema.validate({})
 
     def test_nested_fields(self):
-        schema = Schema({u'text': UnicodeField(),
-                          u'd': DictField({u'a': UnicodeField()})})
-        schema.validate({u'text': u'hello world',
-                          u'd': {u'a': u'bye bye world'}})
+        schema = Schema({u'text': UnicodeField(), u'd': DictField({u'a': UnicodeField()})})
+
+        schema.validate({u'text': u'hello world', u'd': {u'a': u'bye bye world'}})
         self.assertRaises(ValidationError,schema.validate,
-                          {u'text': u'hello world',
-                           u'd': {u'a': u'bye bye world',
-                                  u'b': u'oops'}})
+                {u'text': u'hello world', u'd': {u'a': u'bye bye world', u'b': u'oops'}})
 
     def test_type_as_key(self):
-        schema = Schema({u'text': UnicodeField(),
-                          unicode: LongField()})
-        schema.validate({u'text': u'hello world',
-                          u'a': 200L})
-        self.assertRaises(ValidationError, schema.validate, 
-                          {u'text': u'hello world'})
+        schema = Schema({u'text': UnicodeField(), unicode: LongField()})
+
+        schema.validate({u'text': u'hello world', u'a': 200L})
+        self.assertRaises(ValidationError, schema.validate, {u'text': u'hello world'})
 
     def test_optional_type_as_key(self):
-        schema = Schema({u'text': UnicodeField(),
-                         unicode: LongField(optional=True)})
+        schema = Schema({u'text': UnicodeField(), unicode: LongField(optional=True)})
+
         schema.validate({u'text': u'hello world'})
 
     def test_nested_dictionaries(self):
@@ -80,16 +74,12 @@ class Test(unittest.TestCase):
         # causes a validation error. For testing whether recursion in schema
         # field access works properly.
         schema = Schema({'d': DictField({u'a': LongField()})})
+
         schema.validate({u'd': {'a': 50L}})
-        self.assertRaises(ValidationError, 
-                          schema.validate,
-                          {u'd': {'a': 50L, 
-                                  'b': 20}})
+        self.assertRaises(ValidationError, schema.validate, {u'd': {'a': 50L, 'b': 20}})
         schema.validate({u'd': {'a': 50L}})
 
-        self.assertRaises(ValidationError, schema.validate,
-                          {u'd': {'a': 50L}, 
-                           u'a': 4})
+        self.assertRaises(ValidationError, schema.validate, {u'd': {'a': 50L}, u'a': 4})
         schema.validate({u'd': {'a': 50L}})
 
     def test_list_fields(self):
@@ -102,13 +92,7 @@ class Test(unittest.TestCase):
         self.assertRaises(ValidationError, schema.validate, {u'l': [u'hello']})
 
     def test_schema_subclassing(self):
-        class MySchema(Schema):
-            schema = {u'a': UnicodeField()}
-            
+        class MySchema(Schema): schema = {u'a': UnicodeField()}
+
         MySchema().validate({u'a': u'hello mars'})
         MySchema().validate({}, partial=True)
-
-
-if __name__ == "__main__":
-    #import sys;sys.argv = ['', 'Test.testName']
-    unittest.main()
