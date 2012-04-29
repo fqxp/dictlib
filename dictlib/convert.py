@@ -21,20 +21,21 @@
 from dictlib.utils import walk
 from dictlib.mapping import DotNotationAdapter
 import collections
+from dictlib.schema import Schema
 
 class Converter(object):
     """ A `Converter` can be used to convert a dictionary into another
     dictionary according to a set of rules.
-    
+
     Rules:
-    * `exclude`: a list of  
+    * `exclude`: a list of
     """
     # Fields to exclude when converting to JSON (in dot notation)
     exclude = []
     # A dictionary of tuples for ordered renaming of fields
     rename = []
     factory = lambda o: o
-    
+
     def __init__(self, exclude=None, rename=None, factory=None):
         self.exclude = list(self.exclude + (exclude or []))
         self.rename = list(self.rename + (rename or []))
@@ -59,7 +60,7 @@ class Converter(object):
                 dest_doc[rename_value] = dest_doc[rename_key]
                 del dest_doc[rename_key]
         return dest_doc.doc
-    
+
     def to_schema(self, doc):
         # Work on a copy
         src_doc = DotNotationAdapter(dict(doc))
@@ -74,31 +75,32 @@ class Converter(object):
             dest_key, dest_value = self.map_to(key, value)
             dest_doc[dest_key] = dest_value
         return dest_doc.doc
-    
+
     def exclude_field(self, json_doc, key):
         return key in self.exclude
-    
+
     def map_from(self, key, value):
         return (key, value)
 
     def map_to(self, key, value):
         return (key, value)
-    
+
 class JsonConverter(Converter):
-    """ A `Converter` to convert a schemed dictionary to a JSON-stringifiable 
-    dictionary.
+    """ A `Converter` to convert a schemed dictionary from and to a
+    JSON-stringifiable dictionary.
     """
     def __init__(self, schema, **kwargs):
-        """ Constructor. 
+        """ Constructor.
         :param schema: A schema instance
         :param kwargs: Any keyword arguments to the `Converter` constructor
         """
         super(JsonConverter, self).__init__(**kwargs)
+        assert isinstance(schema, Schema)
         self.schema = schema
 
     def map_from(self, key, value):
-        """ Convert the `value` from the internal Nete document representation 
-        to the Nete API document representation. 
+        """ Convert the `value` from the internal Nete document representation
+        to the Nete API document representation.
         """
         key = key.encode(u'utf-8') if isinstance(key, unicode) else key
         return (key, self.schema.get_field(key).to_json(value))
@@ -112,9 +114,9 @@ class JsonConverter(Converter):
 
 #class JsonSchemaConverter(Converter):
 #    """ A basic `Schema` to JSON Schema converter.
-#    
+#
 #    For reference, see http://tools.ietf.org/html/draft-zyp-json-schema-03
-#    
+#
 #    Some features that don't work yet include:
 #    * exclusive[Mininum,Maximum,minLength,maxLength]
 #    * enum on any list
@@ -122,7 +124,7 @@ class JsonConverter(Converter):
 #    """
 #    schema = Schema({unicode: FieldField(optional=True)})
 #    factory = dict
-#    
+#
 #    def to_json(self, schema):
 #        schema = Schema(super(JsonSchemaConverter, self).to_json(schema.get_schema()))
 #        return self._field_to_json(schema)
@@ -167,6 +169,6 @@ class JsonConverter(Converter):
 #            json_schema_doc[u'type'] = u'string'
 #
 #        return json_schema_doc
-#    
+#
 #    def from_json(self, json_schema_doc):
 #        raise NotImplementedError(u'from_json for JSON schemas is not yet implemented')

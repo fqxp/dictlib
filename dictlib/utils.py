@@ -21,7 +21,7 @@
 import collections
 
 def update_recursive(doc, update_doc, skip_none=False):
-    """ 
+    """
     Updates the dictionary-like object `doc` with the value from `update_doc`
     recursively, e. g.:
     >>> d1 = {'a': 1, 'b': {'c': 3, 'd': 4}}
@@ -50,11 +50,11 @@ def update_recursive(doc, update_doc, skip_none=False):
 def walk(d, field_name=None):
     """ Walk a dictionary `d` recursively by yielding a (`PATH`, `VALUE`) tuple
     for each key/value pair. `PATH` is a list of keys in dot notation.
-    
+
     :param d: A dictionary (nested dictionary or flat dot notation or even mixed)
     :param field_name: Optional parameter to use as initial prefix for dotted
     path
-    """ 
+    """
     for key, value in d.iteritems():
         assert u'.' not in key, u'walk() doesn\'t accept key in dot notation: %s' % key
         yield (u'%s.%s' % (field_name, key) if field_name else key,
@@ -66,13 +66,13 @@ def walk(d, field_name=None):
 def map_dict(doc, fn):
     """ Return a new directory where each key/value pair is replaced by the
     result `(key, value)` tuple of the mapping function `fn`.
-    
+
     As an example for encoding all unicode keys in a dictionary to UTF-8
     encoded byte-strings:
     >>> d = {u'a': {u'b': 42}}
     >>> map_dict(d, lambda k,v: (unicode(k) if type(k) is unicode else k, v))
     {'a': {'b': 42}}
-    
+
     :param doc: A dictionary to apply the mapping function to.
     :param fn: A mapping function which has the signature `fn(key,value)->(key,value)`
     """
@@ -89,8 +89,8 @@ def map_dict(doc, fn):
 
 
 def _get_container_and_key(doc, key):
-    """ For a (possibly) dotted `key`, return the value in `doc`. 
-    """ 
+    """ For a (possibly) dotted `key`, return the value in `doc`.
+    """
     container = doc
     while u'.' in key:
         key, _, rest = key.partition(u'.')
@@ -103,7 +103,7 @@ def _get_container_and_key(doc, key):
             container = container.__getitem__(key)
         key = rest
 
-    try:         
+    try:
         return container, int(key)
     except ValueError:
         return container, key
@@ -111,7 +111,7 @@ def _get_container_and_key(doc, key):
 def getitem(doc, key):
     """ Get the value of `key` in dictionary `doc` (optionally in dotted
     notation).
-        
+
     Examples for keys of dictionary `doc`:
      - doc['a'] -> doc['a']
      - doc['a.b'] -> doc['a']['b']  # b is interpreted as dictionary key
@@ -119,16 +119,16 @@ def getitem(doc, key):
     """
     container, key = _get_container_and_key(doc, key)
 
-    # Make sure we don't get in the way of subclass implementations of 
+    # Make sure we don't get in the way of subclass implementations of
     # __getitem__()
     return container.__getitem__(key)
 
 def throws(excs, f, *args, **kwargs):
-    """ Execute `f` with the `args` and `kwargs` as parameters and return 
+    """ Execute `f` with the `args` and `kwargs` as parameters and return
     `True` if the call raised an exception in `exc`. Return `False` if `f`
     returned without an exception. If an exception not in `excs` is raised,
     it will be re-raised.
-    
+
     :param excs: A list of exception classes or a single exception class
     :param f: A callable
     :param *args: Any non-keyword arguments
@@ -138,7 +138,7 @@ def throws(excs, f, *args, **kwargs):
         excs = [excs]
     try:
         f(*args, **kwargs)
-        return False    
+        return False
     except Exception as e:
         if e.__class__ in excs:
             return True
@@ -146,9 +146,9 @@ def throws(excs, f, *args, **kwargs):
             raise e
 
 def setitem(doc, key, value):
-    """ Set the value of `key` in dictionary `doc` (optionally in dotted 
+    """ Set the value of `key` in dictionary `doc` (optionally in dotted
     notation).
-    
+
     :raises KeyError: If the `key` was not found in `doc`
     :todo: Make this much faster
     """
@@ -160,7 +160,7 @@ def setitem(doc, key, value):
             key = int(key)
         except ValueError:
             pass
-        
+
         if rest:
             rest_key, _, _ = rest.partition('.')
             # Handle non-existing sub-container
@@ -178,7 +178,7 @@ def setitem(doc, key, value):
                     container.__setslice__(key, key+1, [sub_container])
                 else:
                     container.__setitem__(key, sub_container)
-            
+
             container = container.__getitem__(key)
 
     if isinstance(container, collections.MutableSequence) and key == len(container):

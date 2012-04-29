@@ -24,10 +24,10 @@ from distutils.core import setup
 setup(name='dictlib',
       description='Python dictionary utilities',
       author='Frank Ploss',
-      author_email='frank@traal.ath.cx',
+      author_email='frank@fqxp.de',
       version='0.1',
       license='GPL v2',
       keywords='dict dictionary',
-      url='http://nete.org',
+      url='http://fqxp.de',
       packages=['dictlib',],
       )

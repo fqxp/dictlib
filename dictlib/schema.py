@@ -25,6 +25,7 @@ import datetime
 import re
 import time
 import types
+import copy
 
 class SchemaDefinitionError(Exception):
     pass
@@ -32,19 +33,19 @@ class SchemaDefinitionError(Exception):
 class Field(object):
     """ The base class for schema fields. Do not use this class directly, but
     only its subclasses.
-    """ 
+    """
     default = None
     can_be_none = False
     description = None
     title = None
     optional = False
-    
+
     """ The base class for fields in a `DictSchema`.
     """
     def __init__(self, optional=None, default=None, can_be_none=None,
                  title=None, description=None):
         """ Constructor.
-         
+
         :param optional: Whether this field must exist (`False`) or may not
         exist (`True`).
         :param default: The default value if this field is unset (default: `None`).
@@ -58,25 +59,25 @@ class Field(object):
         self.can_be_none = can_be_none if can_be_none is not None else self.can_be_none
         self.title = title if title is not None else self.title
         self.description = description if description is not None else self.description
-    
+
     def validate(self, value, field_name=u'', partial=False):
         """ Validate the field. Subclasses should invoke their parent's
         `validate()` method subsequently.
-        
+
         :raises: `ValidationError` if the given `value` is invalid.
         """
         if value is None and not self.can_be_none:
             raise ValidationError(u'Field %s: Value cannot be None' % field_name)
-        
+
     def from_json(self, value):
-        """ Process value `value` from a dictionary decoded from JSON and 
-        convert it to the program-internal representation. By default, this 
-        simply returns the value itself. 
-        
+        """ Process value `value` from a dictionary decoded from JSON and
+        convert it to the program-internal representation. By default, this
+        simply returns the value itself.
+
         :param value: The value to convert from JSON format.
         """
         return value
-    
+
     def to_json(self, value):
         """ Convert value `value` to a JSON-encodable type. Re-implement in your
         subclass if your type is not normally representable in JSON.
@@ -84,7 +85,7 @@ class Field(object):
         :param value: The value to convert to JSON format.
         """
         return value
-    
+
     def __unicode__(self):
         return u'<%s: optional=%r default=%r can_be_none=%r title=%s description=%s>' % (
                 self.__class__.__name__,
@@ -97,7 +98,7 @@ class AnyField(Field):
     pass
 
 class TypeField(Field):
-    """ A `TypeField` is an abstract baseclass for schema fields that have a specific 
+    """ A `TypeField` is an abstract baseclass for schema fields that have a specific
     Python type.
     """
     type = None
@@ -114,14 +115,14 @@ class FieldField(TypeField):
     used to convert schema definitions themselves.
     """
     type = Field
-            
+
 class NoneField(TypeField):
     """ A schema field with type None, i. e. a field that can only be `None`.
     """
     type = types.NoneType
 
     def __init__(self, optional=False, default=None, title=None, description=None):
-        super(NoneField, self).__init__(optional=optional, default=default, 
+        super(NoneField, self).__init__(optional=optional, default=default,
                                         can_be_none=True, title=title,
                                         description=description)
 
@@ -132,7 +133,7 @@ class AbstractNumericField(TypeField):
     def __init__(self, optional=False, default=None, can_be_none=False,
                  min=None, max=None, title=None, description=None):
         """ See `TypeField`.
-        
+
         :param min: Minimum value this field may have.
         :param max: Maximum value this field may have.
         """
@@ -142,7 +143,7 @@ class AbstractNumericField(TypeField):
                                                    description=description)
         self.min = min
         self.max = max
-        
+
     def validate(self, field_value, field_name=None, partial=False):
         super(AbstractNumericField, self).validate(field_value, field_name, partial)
         if field_value is None and self.can_be_none:
@@ -157,17 +158,17 @@ class IntField(AbstractNumericField):
     """ A schema field for `int` values.
     """
     type = int
-    
+
 class LongField(AbstractNumericField):
     """ A schema field for `long` values.
     """
     type = long
-    
+
 class FloatField(AbstractNumericField):
     """ A schema field for `float` values.
     """
     type = float
-    
+
 class UnicodeField(TypeField):
     """ A schema field for `unicode` values.
     """
@@ -176,27 +177,27 @@ class UnicodeField(TypeField):
     min_len = None
     max_len = None
     match = None
-    
+
     def __init__(self, optional=False, default=None, can_be_none=False,
                  length=None, min_len=None, max_len=None, match=None,
                  title=None, description=None):
         """ See parameters, see `TypeField`.
-        
+
         :param match: A regular expression values of this field must match.
         """
-        super(UnicodeField, self).__init__(optional=optional, default=default, 
-                                           can_be_none=can_be_none, title=title, 
+        super(UnicodeField, self).__init__(optional=optional, default=default,
+                                           can_be_none=can_be_none, title=title,
                                            description=description)
         self.length = length if length is not None else self.length
         self.min_len = min_len if min_len is not None else self.min_len
         self.max_len = max_len if max_len is not None else self.max_len
         self.match = match if match is not None else self.match
-        
+
     def validate(self, value, field_name=None, partial=False):
         super(UnicodeField, self).validate(value, field_name, partial)
         if value is None and self.can_be_none:
             return
-        
+
         if self.length is not None and len(value) != self.length:
             raise ValidationError(u'Field %s: Value %s should have length %d' %
                                   (field_name, value, self.length))
@@ -210,19 +211,19 @@ class UnicodeField(TypeField):
             if self.match and not self.match.match(value):
                 raise ValidationError(u'Field %s: Value %s has wrong format' %
                                       (field_name, value))
-                
+
     def from_json(self, v):
         if type(v) is str:
             return v.decode(u'utf-8')
         else:
             return v
-    
+
     def to_json(self, v):
         if type(v) is unicode:
             return v.encode(u'utf-8')
         else:
             return v
-            
+
 class UuidField(UnicodeField):
     """ A field that only may hold UUID4 values, i. e. 256-bit values as
     32-character hexedecimal strings.
@@ -238,13 +239,13 @@ class EmailField(UnicodeField):
 
 class BaseDatetimeField(TypeField):
     """ A base class for schema fields for `datetime` values.
-    
+
     Values are JSON-encoded to unicode values in ISO date/time format.
     """
     def from_json(self, v):
         timetuple = time.strptime(v, self.dt_format)
         return self.type(*timetuple[self.struct_time_index[0]:self.struct_time_index[1]])
-    
+
     def to_json(self, v):
         return v.strftime(self.dt_format)
 
@@ -277,7 +278,7 @@ class ListField(TypeField):
     """
     type = list
 
-    def __init__(self, fields=None, optional=False, default=None, min_len=0, 
+    def __init__(self, fields=None, optional=False, default=None, min_len=0,
                  max_len=None, can_be_none=False, title=None, description=None):
         """ Constructor.
 
@@ -311,7 +312,7 @@ class ListField(TypeField):
                 except:
                     pass
         return v
-    
+
     def to_json(self, v):
         assert isinstance(v, collections.Sequence)
         for i, value in enumerate(v[:]):
@@ -320,18 +321,18 @@ class ListField(TypeField):
                     v[i] = field.to_json(value)
                     break
         return v
-        
+
     def validate(self, field_value, field_name=None, partial=False):
         super(ListField, self).validate(field_value, field_name)
 
         # Validate list length
         if self.min_len is not None and len(field_value) < self.min_len:
-            raise ValidationError(u'Field %s: List has too few elements (%d)' % 
+            raise ValidationError(u'Field %s: List has too few elements (%d)' %
                                   (field_name, len(field_value)))
         if self.max_len is not None and len(field_value) > self.max_len:
             raise ValidationError(u'Field %s: List has too many elements (%d)'
                                   % (field_name, len(field_value)))
-        
+
         # Check type of each list item
         for i, value in enumerate(field_value):
             is_valid = False
@@ -362,23 +363,24 @@ class DictField(TypeField):
         # Update schema definition from base classes, enabling sub-classing
         # of schemas
         self._schema = {}
-        for cls in reversed(filter(lambda cls: hasattr(cls, u'schema'), 
+        for cls in reversed(filter(lambda cls: hasattr(cls, u'schema'),
                                    self.__class__.__mro__)):
-            if not isinstance(cls.schema, initial):
+            if not isinstance(cls.schema, dict):
                 raise SchemaDefinitionError(u'schema attribute in %s '
-                                            u'is not a initial, but should be' %
+                                            u'is not a dict, but should be' %
                                             cls.__name__)
             self.extend(cls.schema)
+
         if schema:
             self.extend(schema)
 
     def extend(self, other_schema):
         """ Extend (overwrite) the current schema with fields from another
         schema.
-        
+
         :param other_schema: Either a `DictField` instance or a dict schema
         definition
-        :raises SchemaDefinitionError: If there is an error in the schema 
+        :raises SchemaDefinitionError: If there is an error in the schema
         definition
         """
         if isinstance(other_schema, Schema):
@@ -387,7 +389,7 @@ class DictField(TypeField):
             if not isinstance(field, (Field, dict)):
                 raise SchemaDefinitionError(u'Schema attribute %s is not a Field' %
                                             key)
-            # Recursively 
+            # Recursively
             if isinstance(field, (DictField, dict)) and \
                     key in self._schema and \
                     isinstance(self._schema[key], DictField):
@@ -421,7 +423,7 @@ class DictField(TypeField):
         type_field_names = set()
         # For all keys in the document, check if they are defined in the schema
         for key, value in field_value.iteritems():
-            full_field_name = u'%s%s' % (u'%s.' % field_name if field_name else u'', 
+            full_field_name = u'%s%s' % (u'%s.' % field_name if field_name else u'',
                                          key)
             try:
                 field = self.get_field(key)
@@ -430,11 +432,11 @@ class DictField(TypeField):
                     type_field_names.add(key)
             except SchemaFieldNotFound:
                 raise ValidationError(u'Field \'%s\' not defined in schema' % full_field_name)
-            
+
         # Check if all required keys are present in the document
         if not partial:
             for key, field in self._schema.iteritems():
-                full_field_name = u'%s%s' % (u'%s.' % field_name if field_name else u'', 
+                full_field_name = u'%s%s' % (u'%s.' % field_name if field_name else u'',
                                              key)
                 if isinstance(key, types.TypeType):
                     if not field.optional and not any(isinstance(fn, key) for fn in type_field_names):
@@ -448,14 +450,14 @@ class DictField(TypeField):
             key = key.decode(u'utf-8') if isinstance(key, str) else key
             doc[key] = self.get_field(key).from_json(value)
         return doc
-    
+
     def to_json(self, v):
         return dict((key.encode(u'utf-8'), self.get_field(key).to_json(value))
                     for key, value in v.iteritems())
 
     def get_field(self, key):
         """ Return the field definition for `key`.
-        
+
         :param key: A key defined in the dictionary
         :return: An `Field` subclass instance
         :raises KeyError: If `key` is not defined in the schema
@@ -490,21 +492,22 @@ class Schema(DictField):
         """ Create a document from this schema by using the initial values from
         the schema, possibly overwriting them with the initial values from the
         `initial` parameter and leaving out any optional fields.
-        
+
         :initial: A dictionary of initial values which overrule the initial
         values from the schema description. Default: empty.
         :return: A newly created dictionary matching the structure of the schema.
         """
         schema = _subschema or self._schema
-        initial = initial if initial is not None else {}
+        initial = initial or {}
+
         doc = {}
-        
+
         for key, field in schema.iteritems():
-            # Do not create default dictionary if key is a type, e.g. 
+            # Do not create default dictionary if key is a type, e.g.
             # unicode, since we don't know a key name
             if isinstance(key, types.TypeType):
                 continue
-            
+
             if not field.optional:
                 if isinstance(field, DictField):
                     doc[key] = self.create(initial.get(key, {}),
@@ -513,9 +516,9 @@ class Schema(DictField):
                     doc[key] = field.default()
                 else:
                     doc[key] = field.default
-                
+
         update_recursive(doc, initial)
-                
+
         return doc
 
     def is_valid(self, doc):
@@ -529,7 +532,7 @@ class Schema(DictField):
             return True
         except ValidationError:
             return False
-        
+
     def is_partially_valid(self, doc):
         """ Check if `doc` partially matches the schema. A partial match only
         checks if the fields in `doc` match the schema, but not if all required
@@ -540,7 +543,7 @@ class Schema(DictField):
             return True
         except ValidationError:
             return False
-        
+
 class AnySchema(Schema):
     """ A schema that matches all kinds of documents.
     """

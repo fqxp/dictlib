@@ -3,3 +3,4 @@
 /.pydevproject
 /.coverage
 /dist
+*.pyc
