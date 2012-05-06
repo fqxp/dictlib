@@ -18,7 +18,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from dictlib.utils import update_recursive, walk, map_dict, throws
+from dictlib.utils import update_recursive, walk, map_dict, throws, without
 import unittest
 
 class TestUtils(unittest.TestCase):
@@ -67,3 +67,17 @@ class TestUtils(unittest.TestCase):
 
         # test if exceptions not mentioned are re-raised
         self.assertRaises(IndexError, throws, KeyError, f, 667)
+
+    def test_without_returns_dict_with_given_key(self):
+        d = {'foo': 'bar', 'baz': 'foo'}
+
+        d2 = without(d, 'baz')
+
+        self.assertEquals({'foo': 'bar'}, d2)
+
+    def test_without_leaves_given_dict_untouched(self):
+        d = {'foo': 'bar', 'baz': 'foo'}
+
+        d2 = without(d, 'baz')
+
+        self.assertEquals({'foo': 'bar', 'baz': 'foo'}, d)

@@ -195,8 +195,10 @@ def contains(doc, key):
     container, key = _get_container_and_key(doc, key)
     return container.__contains__(key)
 
-#def without(d, exclude_keys):
-#    for key in exclude_keys:
-#        if key in d:
-#            del d[key]
-#    return d
+def without(doc, key):
+    doc_without = doc.copy()
+
+    if key in doc_without:
+        del doc_without[key]
+
+    return doc_without
