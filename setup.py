@@ -28,6 +28,6 @@ setup(name='dictlib',
       version='0.1',
       license='GPL v2',
       keywords='dict dictionary',
-      url='http://fqxp.de',
+      url='https://github.com/frankploss/dictlib',
       packages=['dictlib',],
       )
