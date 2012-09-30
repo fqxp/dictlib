@@ -21,10 +21,13 @@
 from UserDict import DictMixin
 from dictlib.utils import setitem, getitem, delitem, contains
 
+
 __all__ = (u'DotNotationAdapter', u'DotNotationMixin', u'ObjectMappingAdapter',
            u'ObjectMappingMixin')
 
+
 class BaseDictAdapter(DictMixin):
+
     def __init__(self, doc=None):
         """ Default constructor internally memorizes the given `doc` (or any
         empty dictionary if no `doc` is given). You can access the (possibly wrapped)
@@ -45,7 +48,9 @@ class BaseDictAdapter(DictMixin):
             obj = obj._doc
         return obj
 
+
 class DotNotationAdapter(BaseDictAdapter):
+
     def __getitem__(self, key):
         try:
             return getitem(self._doc, key)
@@ -69,6 +74,7 @@ class DotNotationAdapter(BaseDictAdapter):
 
     def keys(self):
         return self._doc.keys()
+
 
 class DotNotationMixin(object):
     """ Return a field by `name`. This method can be used both for dotted
@@ -103,6 +109,7 @@ class DotNotationMixin(object):
     def keys(self):
         return super(DotNotationMixin, self).keys()
 
+
 class ObjectMappingAdapter(BaseDictAdapter):
     def __getitem__(self, key):
         value = self._doc[key]
@@ -134,6 +141,7 @@ class ObjectMappingAdapter(BaseDictAdapter):
 
     def __setattr__(self, key, value):
         self._doc[key] = value
+
 
 class ObjectMappingMixin(object):
     def __getattr__(self, key):

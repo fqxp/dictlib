@@ -21,14 +21,17 @@
 from dictlib.exceptions import ValidationError, SchemaFieldNotFound
 from dictlib.utils import update_recursive
 import collections
+import copy
 import datetime
 import re
 import time
 import types
-import copy
+import uuid
+
 
 class SchemaDefinitionError(Exception):
     pass
+
 
 class Field(object):
     """ The base class for schema fields. Do not use this class directly, but
@@ -92,10 +95,12 @@ class Field(object):
                 self.optional, self.default, self.can_be_none, self.title,
                 self.description)
 
+
 class AnyField(Field):
     """ A field that can hold any value of any type.
     """
     pass
+
 
 class TypeField(Field):
     """ A `TypeField` is an abstract baseclass for schema fields that have a specific
@@ -110,11 +115,13 @@ class TypeField(Field):
             raise ValidationError(u'Field %s: Value %r has wrong type %s' %
                                   (field_name, value, type(value)))
 
+
 class FieldField(TypeField):
     """ A `FieldField` can only have a `Field` instance as a value. This is
     used to convert schema definitions themselves.
     """
     type = Field
+
 
 class NoneField(TypeField):
     """ A schema field with type None, i. e. a field that can only be `None`.
@@ -125,6 +132,7 @@ class NoneField(TypeField):
         super(NoneField, self).__init__(optional=optional, default=default,
                                         can_be_none=True, title=title,
                                         description=description)
+
 
 class AbstractNumericField(TypeField):
     """ The base class for numeric schema fields. In addition to the default
@@ -154,20 +162,24 @@ class AbstractNumericField(TypeField):
         if self.max is not None and field_value > self.max:
             raise ValidationError(u'Field %s: Value %s is larger than %r' % (field_name, field_value, self.max))
 
+
 class IntField(AbstractNumericField):
     """ A schema field for `int` values.
     """
     type = int
+
 
 class LongField(AbstractNumericField):
     """ A schema field for `long` values.
     """
     type = long
 
+
 class FloatField(AbstractNumericField):
     """ A schema field for `float` values.
     """
     type = float
+
 
 class UnicodeField(TypeField):
     """ A schema field for `unicode` values.
@@ -224,18 +236,23 @@ class UnicodeField(TypeField):
         else:
             return v
 
-class UuidField(UnicodeField):
-    """ A field that only may hold UUID4 values, i. e. 256-bit values as
-    32-character hexedecimal strings.
-    """
-    match = re.compile(ur'[0-9a-f]{32}')
-    length = 32
+
+class UuidField(TypeField):
+    type = uuid.UUID
+
+    def to_json(self, v):
+        return str(v)
+
+    def from_json(self, v):
+        return uuid.UUID(v)
+
 
 class EmailField(UnicodeField):
     """ A field that only may hold UUID4 values, i. e. 256-bit values as
     32-character hexedecimal strings.
     """
     match = re.compile(ur'.+@.+')
+
 
 class BaseDatetimeField(TypeField):
     """ A base class for schema fields for `datetime` values.
@@ -249,6 +266,7 @@ class BaseDatetimeField(TypeField):
     def to_json(self, v):
         return v.strftime(self.dt_format)
 
+
 class DatetimeField(BaseDatetimeField):
     """ A schema field for date/time values. JSON datetimes must be strings in
     the format *YYYY-MM-DDThh-mm-ssZ*.
@@ -256,6 +274,7 @@ class DatetimeField(BaseDatetimeField):
     type = datetime.datetime
     dt_format = u'%Y-%m-%dT%H:%M:%SZ'
     struct_time_index = (0, 6)
+
 
 class DateField(BaseDatetimeField):
     """ A schema field for date/time values. JSON datetimes must be strings in
@@ -265,6 +284,7 @@ class DateField(BaseDatetimeField):
     dt_format = u'%Y-%m-%d'
     struct_time_index = (0, 3)
 
+
 class TimeField(BaseDatetimeField):
     """ A schema field for date/time values. JSON datetimes must be strings in
     the format *hh-mm-ss*.
@@ -272,6 +292,7 @@ class TimeField(BaseDatetimeField):
     type = datetime.time
     dt_format = u'%H:%M:%S'
     struct_time_index = (3, 6)
+
 
 class ListField(TypeField):
     """ A schema field for lists.
@@ -348,6 +369,7 @@ class ListField(TypeField):
             if not is_valid:
                 raise ValidationError(u'Field %s[%d]: field_value %r has none of the listed fields' %
                                       (field_name, i, value))
+
 
 class DictField(TypeField):
     """ A `DictField` is used for building nested schemas. You could either
@@ -474,6 +496,7 @@ class DictField(TypeField):
         """
         return self._schema
 
+
 class Schema(DictField):
     """ A definition of a schema. Either derive from this class and set the
     `schema` attribute statically or use `Schema` directly and provide a
@@ -543,6 +566,7 @@ class Schema(DictField):
             return True
         except ValidationError:
             return False
+
 
 class AnySchema(Schema):
     """ A schema that matches all kinds of documents.

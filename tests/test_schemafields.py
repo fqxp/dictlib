@@ -226,7 +226,7 @@ class TestSchemaFields(unittest.TestCase):
         field = UuidField()
 
         try:
-            field.validate(unicode(uuid.uuid4().hex))
+            field.validate(uuid.uuid4())
         except ValidationError:
             self.fail('UuidField.validate raised ValidationError unexpectedly')
 

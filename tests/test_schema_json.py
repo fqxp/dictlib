@@ -71,14 +71,14 @@ class TestSchemaJson(unittest.TestCase):
         self.assertEquals(str, type(f.to_json(u'we are motörhead')))
 
     def test_UuidField_from_json_converts_uuid_to_unicode_string(self):
-        f = UuidField()
+        u = uuid.UUID('b15dee39-f528-4ef0-8bbc-fe761a1d42a6')
 
-        self.assertEquals(u'3a752ef0439f4f74a283baf359dd7e7b', f.from_json('3a752ef0439f4f74a283baf359dd7e7b'))
+        self.assertEquals(u, UuidField().from_json('b15dee39-f528-4ef0-8bbc-fe761a1d42a6'))
 
     def test_UuidField_to_json_converts_uuid_to_unicode_string(self):
-        f = UuidField()
+        u = uuid.UUID('b15dee39-f528-4ef0-8bbc-fe761a1d42a6')
 
-        self.assertEquals('3a752ef0439f4f74a283baf359dd7e7b', f.to_json(u'3a752ef0439f4f74a283baf359dd7e7b'))
+        self.assertEquals('b15dee39-f528-4ef0-8bbc-fe761a1d42a6', UuidField().to_json(u))
 
     def test_DatetimeField_to_json_converts_isocoded_datetime_to_datetime_object(self):
         f = DatetimeField()
