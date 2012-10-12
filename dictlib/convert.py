@@ -27,25 +27,35 @@ class Converter(object):
     """ A `Converter` can be used to convert a dictionary into another
     dictionary according to a set of rules.
 
-    Rules:
-    * `exclude`: a list of
-    """
-    # Fields to exclude when converting to JSON (in dot notation)
-    exclude = []
-    # A dictionary of tuples for ordered renaming of fields
-    rename = []
-    factory = lambda o: o
+    It is suggested to define an application-wide rule for what
+    'converting to' and 'converting from' means. For example, if you are
+    using `Converter`s to convert from an internal representation to an
+    external one, think from the inside out: 'converting from' means
+    converting from the internal representation to the external representation
+    and vice versa.
 
-    def __init__(self, exclude=None, rename=None, factory=None):
-        self.exclude = list(self.exclude + (exclude or []))
+    Rules:
+    * `exclude_from`: a list of fields to ignore when converting from inside (in dot notation)
+    * `exclude_to`: a list of fields to ignore when converting to inside (in dot notation)
+    * `rename`: a list of tuples (from_key, to_key) used to rename attributes in both
+      directions
+    """
+
+    exclude_from = []
+    exclude_to = []
+    rename = []
+
+    def __init__(self, exclude_from=None, exclude_to=None, rename=None):
+        self.exclude_from = list(self.exclude_from + (exclude_from or []))
+        self.exclude_to = list(self.exclude_to + (exclude_from or []))
         self.rename = list(self.rename + (rename or []))
-        self.factory = factory if factory is not None else self.factory
         self.rename_inv = list((v, k) for k, v in self.rename)
 
     def from_schema(self, doc):
         # Exclude and map fields
         src_doc = DotNotationAdapter(doc)
         dest_doc = DotNotationAdapter()
+
         for key, value in walk(src_doc):
             if self.exclude_field(src_doc, key):
                 continue
@@ -54,30 +64,38 @@ class Converter(object):
                 dest_doc[dest_key] = dest_value.__class__()
             else:
                 dest_doc[dest_key] = dest_value
+
         # Rename keys
         for rename_key, rename_value in self.rename:
             if rename_key in dest_doc:
                 dest_doc[rename_value] = dest_doc[rename_key]
                 del dest_doc[rename_key]
+
         return dest_doc.doc
 
     def to_schema(self, doc):
         # Work on a copy
         src_doc = DotNotationAdapter(dict(doc))
         dest_doc = DotNotationAdapter()
+
         # Rename fields
         for rename_key, rename_value in self.rename_inv:
             if rename_key in src_doc:
                 dest_doc[rename_value] = src_doc[rename_key]
                 del src_doc[rename_key]
+
         # Map fields
         for key, value in walk(src_doc):
+            if key in self.exclude_to:
+                continue
+
             dest_key, dest_value = self.map_to(key, value)
             dest_doc[dest_key] = dest_value
+
         return dest_doc.doc
 
     def exclude_field(self, json_doc, key):
-        return key in self.exclude
+        return key in self.exclude_from
 
     def map_from(self, key, value):
         return (key, value)
@@ -85,24 +103,31 @@ class Converter(object):
     def map_to(self, key, value):
         return (key, value)
 
+
 class JsonConverter(Converter):
     """ A `Converter` to convert a schemed dictionary from and to a
     JSON-stringifiable dictionary.
     """
-    def __init__(self, schema, **kwargs):
+    def __init__(self, from_schema, to_schema, **kwargs):
         """ Constructor.
         :param schema: A schema instance
         :param kwargs: Any keyword arguments to the `Converter` constructor
         """
         super(JsonConverter, self).__init__(**kwargs)
-        assert isinstance(schema, Schema)
-        self.schema = schema
+        assert isinstance(from_schema, Schema)
+        assert isinstance(to_schema, Schema)
+        self.from_schema = from_schema
+        self.to_schema = to_schema
+
+    def from_schema(self, doc):
+        pass
 
     def map_from(self, key, value):
         """ Convert the `value` from the internal Nete document representation
         to the Nete API document representation.
         """
         key = key.encode(u'utf-8') if isinstance(key, unicode) else key
+
         return (key, self.schema.get_field(key).to_json(value))
 
     def map_to(self, key, value):
