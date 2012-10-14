@@ -21,7 +21,6 @@
 from dictlib.exceptions import ValidationError, SchemaFieldNotFound
 from dictlib.utils import update_recursive
 import collections
-import copy
 import datetime
 import re
 import time
@@ -91,9 +90,9 @@ class Field(object):
 
     def __unicode__(self):
         return u'<%s: optional=%r default=%r can_be_none=%r title=%s description=%s>' % (
-                self.__class__.__name__,
-                self.optional, self.default, self.can_be_none, self.title,
-                self.description)
+            self.__class__.__name__,
+            self.optional, self.default, self.can_be_none, self.title,
+            self.description)
 
 
 class AnyField(Field):
@@ -238,6 +237,8 @@ class UnicodeField(TypeField):
 
 
 class UuidField(TypeField):
+    """ A field that matches UUID string representations.
+    """
     type = uuid.UUID
 
     def to_json(self, v):
@@ -248,10 +249,15 @@ class UuidField(TypeField):
 
 
 class EmailField(UnicodeField):
-    """ A field that only may hold UUID4 values, i. e. 256-bit values as
-    32-character hexedecimal strings.
+    """ A field that matches e-mail addresses of the form `user@domain.tld`.
     """
     match = re.compile(ur'.+@.+')
+
+
+class UrlField(UnicodeField):
+    """ A field that matches HTTP(S) URLs.
+    """
+    match = re.compile(ur'https?://.+(:\d+)?(/(.+))?')
 
 
 class BaseDatetimeField(TypeField):
